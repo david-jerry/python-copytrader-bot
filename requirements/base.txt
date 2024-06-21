@@ -1,0 +1,16 @@
+python-decouple==3.8
+loguru==0.5.3
+
+python-telegram-bot==20.4
+
+web3==6.9.0
+mnemonic==0.20
+uniswap-python==0.7.1
+uniswap_universal_router_decoder==0.9.1
+
+requests==2.31.0
+asyncio==3.4.3
+asgiref==3.7.2
+
+celery==5.2.7
+redis==5.0.0
