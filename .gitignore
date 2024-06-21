@@ -271,7 +271,8 @@ tags
 dump.rdb
 
 ### Project template
-minecoequity/media/
+!CopyTraderBot/lib/*
+!lib
 
 .pytest_cache/
 .env

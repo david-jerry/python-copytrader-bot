@@ -1,7 +1,8 @@
 import asyncio
 from lib.CryptoWatcher import CryptoWatcherHttp, CryptoWatcherWs
 from lib.Logger import LOGGER
-from telegram import ReplyKeyboardRemove, Update, ParseMode
+from telegram import ReplyKeyboardRemove, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CommandHandler,

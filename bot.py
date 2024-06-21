@@ -1,6 +1,6 @@
 
 
-from telegram.Setup import telegram_setup
+from telegram_commands.Setup import telegram_setup
 
 
 if __name__ == "__main__":

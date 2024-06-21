@@ -1,10 +1,11 @@
 python-decouple==3.8
 loguru==0.5.3
 
-python-telegram-bot==20.4
+python-telegram-bot==21.3
+pydantic==2.7.4
 
 web3==6.9.0
-mnemonic==0.20
+mnemonic==0.21
 uniswap-python==0.7.1
 uniswap_universal_router_decoder==0.9.1
 

@@ -16,7 +16,8 @@ This is a bot that helps you to copy trade whales, swap tokens, and more.
 3. Follow the instructions
 
 <b>Contact us:</b>
-[mailto:jeremiahedavid@gmail.com]
+<a href="mailto://jeremiahedavid@gmail.com">Via Email: jeremiahedavid@gmail.com</a>
+
 
 <b>Disclaimer:</b>
 This bot is for informational purposes only and should not be considered financial advice.

@@ -4,7 +4,8 @@ import traceback
 from warnings import filterwarnings
 from lib.GetDotEnv import DEVELOPER_CHAT_ID, TOKEN, USERNAME
 from lib.Logger import LOGGER
-from telegram import Update, ParseMode
+from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     ConversationHandler,
