@@ -40,7 +40,7 @@ Agreement   |  {user.accepted_on or 'N/A'}
     return message
 
 async def preset_msg(wallet: Optional[UserWallet], preset: Optional[Presets], amount: float):
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
     return f"""
 
 <b>Connected to {wallet.chain_name}</b>
@@ -80,7 +80,7 @@ async def wallet_msg(wallet: Optional[UserWallet]) -> str:
         str: The formatted wallet message.
     """
     # Formatted message with f-strings and textwrap.fill
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     no_wallet_message = f"""
 You currently have no wallet attached to your account.

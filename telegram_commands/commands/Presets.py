@@ -163,7 +163,7 @@ async def process_gas_limit(update: Update, context: CallbackContext):
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
     kb = await setKeyboard(presets_button)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
     amount = await CryptoWallet(network.sn).convert_to_wei(float(text))
 
     preset: Presets = await PresetsData.get_presets_by_id(f"{chat_id}-{wallet.chain_id}")
@@ -241,7 +241,7 @@ async def process_max_gas_price(update: Update, context: CallbackContext):
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
     kb = await setKeyboard(presets_button)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
     amount = await CryptoWallet(network.sn).convert_to_wei(float(text))
 
     preset: Presets = await PresetsData.get_presets_by_id(f"{chat_id}-{wallet.chain_id}")

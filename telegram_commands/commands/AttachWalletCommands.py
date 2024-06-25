@@ -74,7 +74,7 @@ async def accept_public_address(update: Update, context: CallbackContext):
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = WalletData.get_wallet_by_id(chat_id)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0] if wallet is not None else Networks[0]
     valid = await CryptoWallet(network.sn).validate_address(text)
 
     if not valid:
@@ -116,7 +116,7 @@ async def accept_private_key(update: Update, context: CallbackContext):
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = WalletData.get_wallet_by_id(chat_id)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
     valid = CryptoWallet(network.sn).is_valid_private_key(text)
     pubKey = context.user_data.get("pubKey")
 

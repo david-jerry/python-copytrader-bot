@@ -85,7 +85,7 @@ async def process_token_in(update: Update, context: CallbackContext):
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     if len(text) < 25:
         token_in: Coins = await CryptoWallet(network.sn).get_token_id(text)
@@ -150,7 +150,7 @@ async def process_token_out(update: Update, context: CallbackContext):
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     if len(text) < 25:
         token_out: Coins = await CryptoWallet(network.sn).get_token_id(text)
@@ -217,7 +217,7 @@ async def process_amount_in(update: Update, context: CallbackContext):
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
-    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0]
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     min_amount = 0.0143 if wallet.chain_name.lower() != "solana" else 200
 
