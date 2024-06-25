@@ -3,7 +3,9 @@ import redis
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from lib.GetDotEnv import REDIS
-from pydantic import BaseModel
+from pydantic_redis import RedisConfig, Store
+
+from lib.Logger import LOGGER
 
 # Connect to Redis using the Redis URL
 r = redis.from_url(REDIS)
@@ -25,8 +27,9 @@ class RedisStore:
         Example:
             Redis.store_item("users", "user_1", {"name": "Alice", "age": 30, "joined": datetime(2021, 5, 17)})
         """
-        data = self.convert_dates_to_strings(data)
-        json_data = json.dumps(data)
+        cdata = self.convert_dates_to_strings(data)
+        json_data = json.dumps(cdata)
+        LOGGER.debug()
         self.redis_client.hset(key, item_id, json_data)
 
     def delete_item(self, key: str, item_id: str):
@@ -104,15 +107,9 @@ class RedisStore:
             updated_user = Redis.update_item("users", "user_1", {"age": 31})
             print(updated_user["age"])  # Output: 31
         """
-        current_data = self.get_item(key, item_id)
-        if current_data is None:
-            raise ValueError(f"Item with id {item_id} not found under key {key}")
-
-        current_data.update(data)
-        current_data = self.convert_dates_to_strings(current_data)
-        json_data = json.dumps(current_data)
+        cdata = self.convert_dates_to_strings(data)
+        json_data = json.dumps(cdata)
         self.redis_client.hset(key, item_id, json_data)
-        return current_data
 
     def convert_dates_to_strings(self, data: Any) -> Any:
         """

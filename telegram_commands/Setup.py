@@ -4,7 +4,7 @@ import traceback
 from warnings import filterwarnings
 from lib.GetDotEnv import DEVELOPER_CHAT_ID, TOKEN, USERNAME
 from lib.Logger import LOGGER
-from telegram import Update
+from telegram import KeyboardButton, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -17,40 +17,33 @@ from telegram.ext import (
     CallbackContext,
 )
 from telegram.warnings import PTBUserWarning
-from data.Constants import help_message
+from data.Constants import help_message, about_message, faq_messages
+from telegram_commands.commands.ButtonCallback import handle_button_click
 from .CommandsImports import commands
+from .ConversationsImports import (
+    attach_wallet_handler,
+    buy_sell_handler,
+    slippage_handler,
+    total_supply_handler,
+    min_circulating_supply_handler,
+    gas_limit_handler,
+    max_gas_price_handler,
+    copy_trade_handler,
+)
 
 # Suppress specific warnings from the telegram library
-filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
+filterwarnings(
+    action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning
+)
 
-def handle_response(text: str) -> str:
-    """Process the incoming text and return a response."""
-    processed_text = text.lower()
-    if any(word in processed_text for word in ["assist me", "support", "commands", "help"]):
-        return help_message
-    return text
-
-async def handle_message(update: Update, context: CallbackContext) -> None:
-    """Handle incoming messages."""
-    chat_type = update.message.chat.type  # Determine the chat type (private or group)
-    chat_id = update.message.chat.id
-    text = update.message.text  # The message text to be processed
-    LOGGER.debug(f"user: {chat_id} in {chat_type}: '{text}'")
-
-    if chat_type == "private":
-        response = handle_response(text)
-        await context.bot.send_message(chat_id=chat_id, text=response, parse_mode=ParseMode.HTML)
-    else:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="Sorry, I cannot be in a group and would do nothing for you here.",
-        )
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log errors and notify the developer via Telegram."""
     LOGGER.error("Exception while handling an update:", exc_info=context.error)
 
-    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_list = traceback.format_exception(
+        None, context.error, context.error.__traceback__
+    )
     tb_string = "".join(tb_list)
 
     update_str = update.to_dict() if isinstance(update, Update) else str(update)
@@ -62,11 +55,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         f"<pre>{html.escape(tb_string)}</pre>"
     )
 
-    await context.bot.send_message(chat_id=DEVELOPER_CHAT_ID, text=message, parse_mode=ParseMode.HTML)
+    await context.bot.send_message(
+        chat_id=DEVELOPER_CHAT_ID, text=message, parse_mode=ParseMode.HTML
+    )
+
 
 async def log_error(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log errors to the console."""
     LOGGER.error(f"Update: {update}\n\ncaused error: {context.error}")
+
 
 def telegram_setup() -> None:
     """Set up and run the Telegram bot."""
@@ -75,13 +72,45 @@ def telegram_setup() -> None:
     app = Application.builder().token(TOKEN).build()
     LOGGER.info("App Initialized and Ready")
 
-    # Handle messages
-    LOGGER.info("Message handler initiated")
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     for command in commands:
         app.add_handler(command)
 
+    # Handle messages
+    LOGGER.info("Message handler initiated")
+    app.add_handler(
+        MessageHandler(
+            filters.Regex(r"^About$")
+            | filters.Regex(r"^Home$")
+            | filters.Regex(r"^Cancel$")
+            | filters.Regex(r"^Help$")
+            | filters.Regex(r"^FAQ$")
+            | filters.Regex(r"^Accept$")
+            | filters.Regex(r"^Profile$")
+            | filters.Regex(r"^Wallets$")
+            | filters.Regex(r"^Create Wallet$")
+            | filters.Regex(r"^Detach Wallet$")
+            | filters.Regex(r"^Decline$")
+            | filters.Regex(r"^Terminate Agreement$")
+            | filters.Regex(r"^Accept Agreement$")
+            | filters.Regex(r"^Wallet Bal$")
+            | filters.Regex(r"^ETH$")
+            | filters.Regex(r"^POL$")
+            | filters.Regex(r"^SOL$")
+            | filters.Regex(r"^BSC$")
+            | filters.Regex(r"^AVL$")
+            | filters.Regex(r"^Presets$"),
+            handle_button_click,
+        )
+    )
+
+    app.add_handler(attach_wallet_handler)
+    app.add_handler(min_circulating_supply_handler)
+    app.add_handler(slippage_handler)
+    app.add_handler(total_supply_handler)
+    app.add_handler(gas_limit_handler)
+    app.add_handler(max_gas_price_handler)
+    app.add_handler(buy_sell_handler)
+    app.add_handler(copy_trade_handler)
 
     # Error handling
     app.add_error_handler(log_error)
