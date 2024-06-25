@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta
 import json
 from typing import List, Optional
 
-from lib.GetDotEnv import REDIS, REDIS_DB, REDIS_HOST, REDIS_POST
+from lib.GetDotEnv import REDIS, REDIS_DB, REDIS_HOST, REDIS_POST, REDIS_PASSWORD
 from models.CoinsModel import Coins, CurrentPrice, MarketCap, Platform
 from models.CopyTradeModel import UserCopyTradesTasks as UserCopyTrades, UserCopyTradesTasks
 from models.TransactionsModel import UserTransactions
@@ -23,7 +23,7 @@ class UserData:
     def __init__(self) -> None:
         store = Store(
             name="users",
-            url=REDIS,
+            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB, password=REDIS_PASSWORD),
             life_span_in_seconds=None,
         )
         store.register_model(User)
@@ -62,7 +62,7 @@ class WalletData:
     def __init__(self) -> None:
         store = Store(
             name="wallets",
-            url=REDIS,
+            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB, password=REDIS_PASSWORD),
             life_span_in_seconds=None,
         )
         store.register_model(UserWallet)
@@ -106,7 +106,7 @@ class CoinData:
     def __init__(self) -> None:
         store = Store(
             name="coins",
-            url=REDIS,
+            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB, password=REDIS_PASSWORD),
             life_span_in_seconds=60 * 60 * 24 * 2,
         )
         store.register_model(Coins)
@@ -145,7 +145,7 @@ class PresetsData:
     def __init__(self) -> None:
         store = Store(
             name="presets",
-            url=REDIS,
+            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB, password=REDIS_PASSWORD),
             # life_span_in_seconds=60 * 60 * 24 * 2,
         )
         store.register_model(Presets)
@@ -183,7 +183,7 @@ class UserCopyTradesTasksData:
     def __init__(self) -> None:
         store = Store(
             name="copy_trades",
-            url=REDIS,
+            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB, password=REDIS_PASSWORD),
         )
         store.register_model(UserCopyTradesTasks)
 
