@@ -4,6 +4,7 @@ import json
 from mnemonic import Mnemonic
 import requests
 from web3 import Web3
+from web3.contract import Contract
 from eth_account import Account
 import secrets
 from typing import Dict, Any, Optional
@@ -246,9 +247,10 @@ class CryptoWallet:
             tx_url = CryptoWallet.send_token(abi, "0xContractAddress", "0xSenderPrivateKey", "0xRecipientAddress", 1.0)
             print(tx_url)  # Output: Etherscan transaction URL
         """
+
         sender_account = self.w3.eth.account.from_key(sender_private_key)
         nonce = self.w3.eth.get_transaction_count(sender_account.address)
-        contract = self.w3.eth.contract(contract_address, abi)
+        contract: type[Contract] = self.w3.eth.contract(contract_address, abi)
         token_amount = self.w3.to_wei(amount_ether, "ether")
 
         gas_estimate = contract.functions.transfer(
@@ -437,7 +439,7 @@ class CryptoWallet:
         amount_out_min_wei = self.w3.to_wei(amount_out_min, "ether")
         path = [token_in, token_out]
 
-        router_contract = self.w3.eth.contract(address=router_address, abi=router_abi)
+        router_contract: type[Contract] = self.w3.eth.contract(address=router_address, abi=router_abi)
         deadline_timestamp = self.w3.eth.get_block("latest")["timestamp"] + deadline
         gas_price = await self.get_gas_price()
 
