@@ -28,11 +28,13 @@ agreement_buttons = [
 ]
 
 wallet_buttons = [
+    [KeyboardButton(f"🪙 {chain.sn}") for chain in Networks],
     [KeyboardButton("Create Wallet"), KeyboardButton("Attach Wallet")],
     [KeyboardButton("Profile")],
 ]
 
 wallet_button_II = [
+    [KeyboardButton(f"🪙 {chain.sn}") for chain in Networks],
     [KeyboardButton("Detach Wallet"), KeyboardButton("Wallet Bal")],
     [KeyboardButton("Profile")],
 ]
