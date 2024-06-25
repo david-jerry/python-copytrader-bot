@@ -294,7 +294,7 @@ class CryptoWallet:
                 return "Transaction failed"
         except Exception as e:
             LOGGER.error(e)
-            if 'insufficient funds for gas' in e:
+            if 'insufficient funds for gas' in str(e):
                 return "Insufficient Balance"
             return str(e)
 
@@ -507,7 +507,7 @@ class CryptoWallet:
                 return "Token swap failed"
         except Exception as e:
             LOGGER.error(e)
-            if 'insufficient funds for gas' in e:
+            if 'insufficient funds for gas' in str(e):
                 return "Insufficient Balance"
             return str(e)
 
