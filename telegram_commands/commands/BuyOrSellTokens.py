@@ -52,7 +52,7 @@ async def buy_and_sell_trigger(update: Update, context: CallbackContext):
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
 
-    if text == "Buy/Sell":
+    if text == "Buy/Sell" or text == "Swap":
         wallet = await WalletData.get_wallet_by_id(chat_id)
         if usr and wallet is not None:
             response_text = """
