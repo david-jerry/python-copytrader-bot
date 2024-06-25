@@ -52,7 +52,7 @@ presets_button = [
 
 async def setWalletKeyboard():
     wb2 = [
-        [KeyboardButton(chain.sn) for chain in Networks],
+        [KeyboardButton(f"🪙 {chain.sn}") for chain in Networks],
         [KeyboardButton("Detach Wallet"), KeyboardButton("Wallet Bal")],
         [KeyboardButton("Profile")],
     ]

@@ -154,31 +154,31 @@ async def handle_button_click(update: Update, context: CallbackContext):
             if user and user.accepted_agreement:
                 kb = await setKeyboard(auth_start_buttons)
             response_text = "You accepted CopiTradaBot Usage Agreement. We are happy to have you onboard. You should take the time to click the help to get a list of available commands you can execute"
-        elif text == "ETH":
+        elif text == "🪙 ETH":
             network: Network  = [network for network in Networks if network.sn == "ETH"][0]
             data = {"chain_id": network.id, "chain_name": network.name}
             wallet = await WalletData.update_wallet(chat_id, data)
             kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
-        elif text == "POL":
+        elif text == "🪙 POL":
             network: Network = [network for network in Networks if network.sn == "POL"][0]
             data = {"chain_id": network.id, "chain_name": network.name}
             wallet = await WalletData.update_wallet(chat_id, data)
             kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
-        elif text == "SOL":
+        elif text == "🪙 SOL":
             network: Network = [network for network in Networks if network.sn == "SOL"][0]
             data = {"chain_id": network.id, "chain_name": network.name}
             wallet = await WalletData.update_wallet(chat_id, data)
             kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
-        elif text == "BSC":
+        elif text == "🪙 BSC":
             network: Network = [network for network in Networks if network.sn == "BSC"][0]
             data = {"chain_id": network.id, "chain_name": network.name}
             wallet = await WalletData.update_wallet(chat_id, data)
             kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
-        elif text == "AVL":
+        elif text == "🪙 AVL":
             network: Network = [network for network in Networks if network.sn == "AVL"][0]
             data = {"chain_id": network.id, "chain_name": network.name}
             wallet = await WalletData.update_wallet(chat_id, data)
