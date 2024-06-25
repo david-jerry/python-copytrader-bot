@@ -141,7 +141,7 @@ async def handle_button_click(update: Update, context: CallbackContext):
             response_text = help_message
         elif text == "FAQ":
             response_text = faq_messages
-        elif text == "Accept":
+        elif text == "✅ Accept":
             data = {
                 "user_id": chat_id,
                 "first_name": user.first_name or None,
@@ -224,7 +224,7 @@ async def handle_button_click(update: Update, context: CallbackContext):
                 reply_markup=kb,
             )
             return ConversationHandler.END
-        elif text == "Decline" or text == "Terminate Agreement":
+        elif text == "Decline ❌" or text == "Terminate Agreement":
             data = {
                 "user_id": chat_id,
                 "first_name": user.first_name or None,

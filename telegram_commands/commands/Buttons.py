@@ -23,7 +23,7 @@ profile_buttons = [
 ]
 
 agreement_buttons = [
-    [KeyboardButton("Accept"), KeyboardButton("Decline")],
+    [KeyboardButton("✅ Accept"), KeyboardButton("Decline ❌")],
     [KeyboardButton("Home")],
 ]
 
