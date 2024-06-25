@@ -1,6 +1,6 @@
 **README.md**
 
-**# Python Copytrader Bot**
+# Python Copytrader Bot
 
 This Python-based copytrader bot simplifies cryptocurrency trading by enabling you to:
 
