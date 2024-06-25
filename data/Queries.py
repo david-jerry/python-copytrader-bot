@@ -23,7 +23,7 @@ class UserData:
     def __init__(self) -> None:
         store = Store(
             name="users",
-            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB),
+            url=REDIS,
             life_span_in_seconds=None,
         )
         store.register_model(User)
@@ -62,7 +62,7 @@ class WalletData:
     def __init__(self) -> None:
         store = Store(
             name="wallets",
-            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB),
+            url=REDIS,
             life_span_in_seconds=None,
         )
         store.register_model(UserWallet)
@@ -106,7 +106,7 @@ class CoinData:
     def __init__(self) -> None:
         store = Store(
             name="coins",
-            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB),
+            url=REDIS,
             life_span_in_seconds=60 * 60 * 24 * 2,
         )
         store.register_model(Coins)
@@ -145,7 +145,7 @@ class PresetsData:
     def __init__(self) -> None:
         store = Store(
             name="presets",
-            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB),
+            url=REDIS,
             # life_span_in_seconds=60 * 60 * 24 * 2,
         )
         store.register_model(Presets)
@@ -183,7 +183,7 @@ class UserCopyTradesTasksData:
     def __init__(self) -> None:
         store = Store(
             name="copy_trades",
-            redis_config=RedisConfig(host=REDIS_HOST, port=REDIS_POST, db=REDIS_DB),
+            url=REDIS,
         )
         store.register_model(UserCopyTradesTasks)
 
