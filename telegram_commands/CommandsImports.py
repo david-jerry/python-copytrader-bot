@@ -6,6 +6,7 @@ from .commands.Actions import (
     help,
     faq,
     start,
+    stop_trade,
 )
 from telegram.ext import (
     Application,
@@ -23,6 +24,8 @@ about = CommandHandler("about", about)
 help = CommandHandler("help", help)
 faq = CommandHandler("faq", faq)
 start = CommandHandler("start", start)
+home = CommandHandler("home", start)
+stop_trade = CommandHandler("stop_copytrade", stop_trade)
 
 
-commands = [cancel, about, help, faq, start] # start_copytrade, stop_watch_ws
+commands = [cancel, about, help, faq, start, stop_trade, home] # start_copytrade, stop_watch_ws

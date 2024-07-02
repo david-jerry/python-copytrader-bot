@@ -29,6 +29,10 @@ from .ConversationsImports import (
     gas_limit_handler,
     max_gas_price_handler,
     copy_trade_handler,
+    gas_delta_handler,
+    balance_tradable_handler,
+    snipe_profit_handler,
+    snipe_loss_handler
 )
 
 # Suppress specific warnings from the telegram library
@@ -84,20 +88,21 @@ def telegram_setup() -> None:
             | filters.Regex(r"^Cancel$")
             | filters.Regex(r"^Help$")
             | filters.Regex(r"^FAQ$")
-            | filters.Regex(r"^Accept$")
+            | filters.Regex(r"^✅ Accept$")
             | filters.Regex(r"^Profile$")
             | filters.Regex(r"^Wallets$")
+            | filters.Regex(r"^Attach Wallet$")
             | filters.Regex(r"^Create Wallet$")
             | filters.Regex(r"^Detach Wallet$")
-            | filters.Regex(r"^Decline$")
+            | filters.Regex(r"^Decline ❌$")
             | filters.Regex(r"^Terminate Agreement$")
             | filters.Regex(r"^Accept Agreement$")
             | filters.Regex(r"^Wallet Bal$")
-            | filters.Regex(r"^ETH$")
-            | filters.Regex(r"^POL$")
-            | filters.Regex(r"^SOL$")
-            | filters.Regex(r"^BSC$")
-            | filters.Regex(r"^AVL$")
+            | filters.Regex(r"^🪙 ETH$")
+            | filters.Regex(r"^🪙 POL$")
+            | filters.Regex(r"^🪙 SOL$")
+            | filters.Regex(r"^🪙 BSC$")
+            | filters.Regex(r"^🪙 AVL$")
             | filters.Regex(r"^Presets$"),
             handle_button_click,
         )
@@ -111,6 +116,10 @@ def telegram_setup() -> None:
     app.add_handler(max_gas_price_handler)
     app.add_handler(buy_sell_handler)
     app.add_handler(copy_trade_handler)
+    app.add_handler(gas_delta_handler)
+    app.add_handler(balance_tradable_handler)
+    app.add_handler(snipe_profit_handler)
+    app.add_handler(snipe_loss_handler)
 
     # Error handling
     app.add_error_handler(log_error)

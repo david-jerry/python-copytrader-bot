@@ -92,7 +92,7 @@ agreement_message_I = """
 1.2 The User shall not:
 
     Use the Bot for any illegal or unauthorized purpose;
-    Modify, reverse engineer, decompile, disassemble, or attempt to discover the source code of the Bot;
+    Modify, reverse engineer, decouple, disassemble, or attempt to discover the source code of the Bot;
     Interfere with the operation of the Bot or any servers or networks connected to the Bot;
     Use the Bot to transmit any malware, viruses, or other harmful code;
     Violate any applicable laws or regulations.
@@ -150,7 +150,7 @@ agreement_message_III = """
 
 11.1 All notices and other communications hereunder shall be in writing and shall be deemed to have been duly given when delivered personally, sent by certified or registered mail, postage prepaid, return receipt requested, or sent by overnight courier, addressed as follows:
 
-    If to You: 5 Sabbath Road, Rukpokwu, Port Harcourt, Nigeria
+    If to You: 4 A Close, Gwarimpa, Abuja, FCT, Nigeria
     If to the User: The User's email address or other address as specified by the User
 
 12. Assignment

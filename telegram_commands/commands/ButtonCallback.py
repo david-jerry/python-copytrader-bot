@@ -1,7 +1,8 @@
 from datetime import datetime, date
 from typing import Optional
 from data.Networks import Networks, Network
-from data.Queries import UserData, WalletData
+from data.Queries import PresetsData, UserData, WalletData
+from solders.keypair import Keypair
 from lib.Logger import LOGGER
 from telegram import ForceReply, ReplyKeyboardRemove, Update
 from telegram.constants import ParseMode
@@ -23,9 +24,10 @@ from data.Constants import (
     agreement_message_II,
     agreement_message_III,
 )
-from lib.WalletClass import CryptoWallet
+from lib.WalletClass import ETHWallet, SolanaWallet
+from models.Presets import Presets
 from models.UserModel import User, UserWallet
-from telegram_commands.commands.Messages import profile_msg, wallet_msg
+from telegram_commands.commands.Messages import preset_msg, profile_msg, wallet_msg
 from .Buttons import (
     setWalletKeyboard,
     start_buttons,
@@ -34,6 +36,7 @@ from .Buttons import (
     agreement_buttons,
     profile_buttons,
     wallet_buttons,
+    attach_buttons,
     wallet_button_II,
     setKeyboard,
 )
@@ -113,7 +116,6 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
 async def handle_button_click(update: Update, context: CallbackContext):
     chat_type = update.message.chat.type  # Determine the chat type (private or group)
     chat_id = update.effective_chat.id
-    chain = context.user_data.get("chain") or "ETH"
     user = update.message.from_user
     text = update.message.text  # Get the text from the button pressed
 
@@ -121,16 +123,19 @@ async def handle_button_click(update: Update, context: CallbackContext):
     LOGGER.debug(f"user: {chat_id} in {chat_type}: '{text}'")
     # Implement logic based on the button text
     usr: User | None = await UserData.get_user_by_id(chat_id)
+    wallet: UserWallet = await WalletData.get_wallet_by_id(chat_id)
+    presets = await PresetsData.get_presets_by_id(chat_id)
+
     if usr is not None and usr.accepted_agreement:
-        kb = await setKeyboard(auth_start_buttons)
+        kb = await setKeyboard(auth_start_buttons) if wallet is not None else await setKeyboard(wallet_buttons)
     elif usr is None:
-        user_json = {
-            "user_id": chat_id,
-            "first_name": user.first_name or None,
-            "last_name": user.last_name or None,
-            "username": user.username or None,
-        }
-        await UserData.create_user(user_json)
+        user_json = User(
+            user_id = chat_id,
+            first_name = user.first_name or None,
+            last_name = user.last_name or None,
+            username = user.username or None,
+        )
+        usr = await UserData.create_user(user_json)
 
     if chat_type == "private":
         if text == "About":
@@ -143,68 +148,111 @@ async def handle_button_click(update: Update, context: CallbackContext):
             response_text = faq_messages
         elif text == "✅ Accept":
             data = {
-                "user_id": chat_id,
-                "first_name": user.first_name or None,
-                "last_name": user.last_name or None,
-                "username": user.username or None,
                 "accepted_agreement": True,
                 "accepted_on": date.today(),
             }
             user: User = await UserData.update_user(chat_id, data)
             if user and user.accepted_agreement:
-                kb = await setKeyboard(auth_start_buttons)
+                kb = await setKeyboard(auth_start_buttons) if wallet is not None else await setKeyboard(wallet_buttons)
             response_text = "You accepted CopiTradaBot Usage Agreement. We are happy to have you onboard. You should take the time to click the help to get a list of available commands you can execute"
         elif text == "🪙 ETH":
-            network: Network  = [network for network in Networks if network.sn == "ETH"][0]
-            data = {"chain_id": network.id, "chain_name": network.name}
-            wallet = await WalletData.update_wallet(chat_id, data)
-            kb = await setWalletKeyboard()
+            if wallet is not None:
+                network: Network  = [network for network in Networks if network.sn == "ETH"][0]
+                data = {"chain_id": network.id, "chain_name": network.name}
+                wallet = await WalletData.update_wallet(chat_id, data)
+                kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
         elif text == "🪙 POL":
-            network: Network = [network for network in Networks if network.sn == "POL"][0]
-            data = {"chain_id": network.id, "chain_name": network.name}
-            wallet = await WalletData.update_wallet(chat_id, data)
-            kb = await setWalletKeyboard()
+            if wallet is not None:
+                network: Network = [network for network in Networks if network.sn == "POL"][0]
+                data = {"chain_id": network.id, "chain_name": network.name}
+                wallet = await WalletData.update_wallet(chat_id, data)
+                kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
         elif text == "🪙 SOL":
-            network: Network = [network for network in Networks if network.sn == "SOL"][0]
-            data = {"chain_id": network.id, "chain_name": network.name}
-            wallet = await WalletData.update_wallet(chat_id, data)
-            kb = await setWalletKeyboard()
+            if wallet is not None:
+                network: Network = [network for network in Networks if network.sn == "SOL"][0]
+                data = {"chain_id": network.id, "chain_name": network.name}
+                wallet = await WalletData.update_wallet(chat_id, data)
+                kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
         elif text == "🪙 BSC":
-            network: Network = [network for network in Networks if network.sn == "BSC"][0]
-            data = {"chain_id": network.id, "chain_name": network.name}
-            wallet = await WalletData.update_wallet(chat_id, data)
-            kb = await setWalletKeyboard()
+            if wallet is not None:
+                network: Network = [network for network in Networks if network.sn == "BSC"][0]
+                data = {"chain_id": network.id, "chain_name": network.name}
+                wallet = await WalletData.update_wallet(chat_id, data)
+                kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
         elif text == "🪙 AVL":
-            network: Network = [network for network in Networks if network.sn == "AVL"][0]
-            data = {"chain_id": network.id, "chain_name": network.name}
-            wallet = await WalletData.update_wallet(chat_id, data)
-            kb = await setWalletKeyboard()
+            if wallet is not None:
+                network: Network = [network for network in Networks if network.sn == "AVL"][0]
+                data = {"chain_id": network.id, "chain_name": network.name}
+                wallet = await WalletData.update_wallet(chat_id, data)
+                kb = await setWalletKeyboard()
             response_text = await wallet_msg(wallet)
         elif text == "Profile":
             response_text = profile_msg(usr)
-            if usr:
+            if usr and wallet is not None:
                 kb = await setKeyboard(profile_buttons)
         elif text == "Wallets":
-            wallet = await WalletData.get_wallet_by_id(chat_id)
             response_text = await wallet_msg(wallet)
             if usr:
                 if wallet is not None:
                     kb = await setWalletKeyboard()
                 else:
                     kb = await setKeyboard(wallet_buttons)
+        elif text == "Attach Wallet":
+            if usr and wallet is None:
+                response_text = await wallet_msg(wallet)
+                kb = await setKeyboard(attach_buttons)
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=response_text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=kb,
+                )
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="We do not have you on our database. Please type this command '/start'",
+                parse_mode=ParseMode.HTML,
+                reply_markup=kb,
+            )
         elif text == "Create Wallet":
-            data = await CryptoWallet().create_wallet(chat_id)
-            LOGGER.info(data)
-            wallet = await WalletData.create_wallet(data)
+            network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
+
+            eth_wallet = await ETHWallet(network.sn).generate_multi_chain_wallet()
+            sol_wallet = await SolanaWallet().generate_multi_chain_wallet()
+            data: UserWallet = UserWallet(
+                user_id=chat_id,
+                pub_key=eth_wallet[0],
+                sec_key=eth_wallet[1],
+                mnemonic=eth_wallet[2],
+                sol_pub_key=sol_wallet[0],
+                sol_sec_key=sol_wallet[1],
+                sol_mnemonic=sol_wallet[2],
+                pass_phrase=text,
+                chain_name=network.name,
+                chain_id=network.id,
+            )
+            wallet: UserWallet = await WalletData.create_wallet(data)
+
+
+            data = Presets(
+                id=str(chat_id),
+                chain_id=str(data.chain_id),
+                chain_name=data.chain_name,
+                snipe_stop_loss=0.05,
+                gas_limit=500,
+                max_gas_price=10000,
+                min_circulating_supply=50000,
+                min_token_supply=10000,
+            )
+            await PresetsData.create_presets(data)
             response_text = await wallet_msg(wallet)
             if usr:
                 kb = await setKeyboard(wallet_button_II)
         elif text == "Presets":
-            response_text = "Select a preset to use"
+            response_text = await preset_msg(wallet, presets)
             kb = await setKeyboard(presets_button)
         elif text == "Detach Wallet":
             wallet = await WalletData.delete_wallet(chat_id)
@@ -226,10 +274,6 @@ async def handle_button_click(update: Update, context: CallbackContext):
             return ConversationHandler.END
         elif text == "Decline ❌" or text == "Terminate Agreement":
             data = {
-                "user_id": chat_id,
-                "first_name": user.first_name or None,
-                "last_name": user.last_name or None,
-                "username": user.username or None,
                 "accepted_agreement": False,
                 "accepted_on": None,
             }

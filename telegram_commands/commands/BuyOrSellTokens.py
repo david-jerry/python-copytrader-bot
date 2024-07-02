@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from typing import Optional
 from data.Networks import Network, Networks
-from data.Queries import CoinData, UserData, WalletData
+from data.Queries import CoinData, PresetsData, UserData, WalletData
 from lib.Logger import LOGGER
 from telegram import ForceReply, ReplyKeyboardRemove, Update
 from telegram.constants import ParseMode
@@ -23,7 +23,10 @@ from data.Constants import (
     agreement_message_II,
     agreement_message_III,
 )
-from lib.WalletClass import CryptoWallet
+from lib.TokenMetadata import TokenMetadata
+from lib.Types import TokenInfo
+from lib.WalletClass import ETHWallet, SolanaWallet
+from models import Presets
 from models.CoinsModel import Coins, Platform
 from models.UserModel import User, UserWallet
 from telegram_commands.commands.Messages import profile_msg, wallet_msg
@@ -51,12 +54,15 @@ async def buy_and_sell_trigger(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     text = update.message.text  # Get the text from the button pressed
     usr: User | None = await UserData.get_user_by_id(chat_id)
+    network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     if text == "Buy/Sell" or text == "Swap":
         wallet = await WalletData.get_wallet_by_id(chat_id)
         if usr and wallet is not None:
-            response_text = """
+            response_text = f"""
 Provide the token name eg: (USDT) or token's contract address you would like to swap for:
+
+This should be a valid {network.name} contract address or token symbol
                 """
             kb = ForceReply(selective=True, input_field_placeholder="Token In")
             await context.bot.send_message(
@@ -88,7 +94,7 @@ async def process_token_in(update: Update, context: CallbackContext):
     network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     if len(text) < 25:
-        token_in: Coins = await CryptoWallet(network.sn).get_token_id(text)
+        token_in: Coins = await TokenMetadata().get_token_id(text)
         if token_in is not None and not token_in.platforms.ethereum:
             response_text = "We do not have this token's contract address, Please provide the token address so we can update our data."
             kb = ForceReply(
@@ -103,10 +109,10 @@ async def process_token_in(update: Update, context: CallbackContext):
             context.user_data["update_symbol"] = token_in.symbol
             return TOKEN_IN
         CoinData
-        context.user_data["tokenIn"] = token_in.platforms.ethereum
+        context.user_data["tokenIn"] = token_in.platforms.ethereum if network.sn != "SOL" else token_in.platforms.solana
     else:
-        valid = await CryptoWallet(network.sn).validate_address(text)
-        if not valid:
+        valid = await ETHWallet(network.sn).validate_address(text)
+        if not valid and network.sn != "SOL":
             response_text = "Invalid contract address, Please provide the correct contract address for this token."
             kb = ForceReply(
                 selective=True, input_field_placeholder="Token In Contract Address"
@@ -119,14 +125,19 @@ async def process_token_in(update: Update, context: CallbackContext):
             )
             return TOKEN_IN
         symbol = context.user_data.get("update_symbol")
-        if symbol:
+        if symbol and network.sn != "SOL":
             Platform.update(_id=symbol, data={"ethereum": text})
+        else:
+            Platform.update(_id=symbol, data={"solana": text})
+
         context.user_data["tokenIn"] = text
 
     wallet = await WalletData.get_wallet_by_id(chat_id)
     if usr and wallet is not None:
-        response_text = """
+        response_text = f"""
 Provide the token name eg: (USDT) or token's contract address you would like to get in exchange:
+
+This should be a valid {network.name} contract address or token symbol
             """
         kb = ForceReply(selective=True, input_field_placeholder="Token Out")
         await context.bot.send_message(
@@ -153,8 +164,8 @@ async def process_token_out(update: Update, context: CallbackContext):
     network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
 
     if len(text) < 25:
-        token_out: Coins = await CryptoWallet(network.sn).get_token_id(text)
-        if token_out is not None and not token_out.platforms.ethereum:
+        token_out: Coins = await TokenMetadata().get_token_id(text)
+        if token_out is not None and not (token_out.platforms.ethereum or token_out.platforms.solana):
             response_text = "We do not have this token's contract address, Please provide the token address so we can update our data."
             kb = ForceReply(
                 selective=True, input_field_placeholder="Token Out Contract Address"
@@ -167,9 +178,9 @@ async def process_token_out(update: Update, context: CallbackContext):
             )
             context.user_data["update_symbol"] = token_out.symbol
             return TOKEN_OUT
-        context.user_data["tokenOut"] = token_out.platforms.ethereum
+        context.user_data["tokenOut"] = token_out.platforms.ethereum if network.sn != "SOL" else token_out.platforms.solana
     else:
-        valid = await CryptoWallet(network.sn).validate_address(text)
+        valid = await ETHWallet(network.sn).validate_address(text)
         if not valid:
             response_text = "Invalid contract address, Please provide the correct contract address for this token."
             kb = ForceReply(
@@ -183,8 +194,10 @@ async def process_token_out(update: Update, context: CallbackContext):
             )
             return TOKEN_OUT
         symbol = context.user_data.get("update_symbol")
-        if symbol:
+        if symbol and network.sn != "SOL":
             Platform.update(_id=symbol, data={"ethereum": text})
+        else:
+            Platform.update(_id=symbol, data={"solana": text})
         context.user_data["tokenOut"] = text
 
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
@@ -218,8 +231,9 @@ async def process_amount_in(update: Update, context: CallbackContext):
     usr: User | None = await UserData.get_user_by_id(chat_id)
     wallet: Optional[UserWallet] = await WalletData.get_wallet_by_id(chat_id)
     network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
+    preset: Presets.Presets = await PresetsData.get_presets_by_id(chat_id)
 
-    min_amount = 0.0143 if wallet.chain_name.lower() != "solana" else 200
+    min_amount = 0.0143 if wallet.chain_name.lower() != "solana" else 5.0
 
     if not float(text) >= min_amount:
         response_text = f"Insufficient trade amount. Minimum expected amount to swap is: <b>{min_amount} {'ETH' if wallet.chain_name.lower() != 'solana' else 'SOL'}</b>"
@@ -237,25 +251,41 @@ async def process_amount_in(update: Update, context: CallbackContext):
 
     amountIn = float(text)
 
-    tokenInContractAddress = await CryptoWallet(network.sn).convert_to_checksum(
-        context.user_data.get("tokenIn")
-    )
-    tokenOutContractAddress = await CryptoWallet(network.sn).convert_to_checksum(
-        context.user_data.get("tokenOut")
-    )
+    if network.sn != "SOL":
+        tokenInContractAddress = await ETHWallet(network.sn).convert_to_checksum(
+            context.user_data.get("tokenIn")
+        )
+        tokenOutContractAddress = await ETHWallet(network.sn).convert_to_checksum(
+            context.user_data.get("tokenOut")
+        )
 
-    amountOut = await CryptoWallet(network.sn).calculate_amount_out(
-        amountIn, tokenInContractAddress, tokenOutContractAddress
-    )
+        tokenInMetadata: Optional[TokenInfo] = await TokenMetadata.get_token_symbol_by_contract(tokenInContractAddress)
+        tokenOutMetadata: Optional[TokenInfo] = await TokenMetadata.get_token_symbol_by_contract(tokenOutContractAddress)
+
+        amountIn_wei = amountIn * 10**tokenInMetadata.decimal.ethereum
+
+        amountOut = await ETHWallet(network.sn).calculate_eth_amount_out(
+            amountIn_wei, tokenInContractAddress, tokenOutContractAddress
+        )
+
+        amountOut_wei = amountOut * 10**tokenOutMetadata.decimal.ethereum
 
 
-    transactionHash = await CryptoWallet(network.sn).swap_tokens_uniswap(
-        wallet.sec_key,
-        tokenInContractAddress,
-        tokenOutContractAddress,
-        amountIn,
-        amountOut,
-    )
+        transactionHash = await ETHWallet(network.sn).swap_tokens_with_uniswap(
+            wallet.sec_key,
+            tokenInContractAddress,
+            tokenOutContractAddress,
+            amountIn_wei,
+            amountOut_wei,
+        )
+    else:
+        transactionHash = await SolanaWallet().execute_swap(
+            wallet.sol_sec_key,
+            tokenInContractAddress,
+            tokenOutContractAddress,
+            amountIn,
+            preset.slippage if preset is not None else 0.24,
+        )
 
     response_text = transactionHash
     kb = await setKeyboard(profile_buttons)

@@ -15,3 +15,7 @@ redis-om==0.2.2
 hiredis==2.3.2
 pydantic-redis==0.5.0
 
+jupiter-python-sdk==0.0.2.0
+bip_utils==2.7.0
+pandas==2.2.2
+aiohttp==3.8.5

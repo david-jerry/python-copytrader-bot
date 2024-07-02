@@ -1,11 +1,28 @@
 import asyncio
+from typing import Optional
 from telegram import Bot
 from web3 import Web3
+from solders.pubkey import Pubkey  # type: ignore
 from web3.middleware import geth_poa_middleware
-from lib.GetDotEnv import INFURA_HTTP_URL, INFURA_WS_URL, TOKEN
+from data.Networks import Network, Networks
+from data.Queries import PresetsData, WalletData
+from lib.GetDotEnv import (
+    AVALANCHE_HTTP_URL,
+    BSC_HTTP_URL,
+    INFURA_HTTP_URL,
+    INFURA_WS_URL,
+    POLYGON_HTTP_URL,
+    TOKEN,
+)
 from lib.Logger import LOGGER
+from lib.TokenMetadata import TokenMetadata
+from lib.WalletClass import ETHWallet, SolanaWallet
+from models.Presets import Presets
+from models.UserModel import UserWallet
 from telegram_commands.commands.Buttons import setKeyboard, auth_start_buttons
+
 bot = Bot(TOKEN)
+
 
 class HttpCryptoCopyTrader:
     """
@@ -122,17 +139,39 @@ class WsCryptoCopyTrader:
         "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
         "0x89Fa1974120d2a7F83a0cb80df3654721c6a38Cd",
     ]
+    """
+    uniswap: for ethereum main net and polygon
+    pancakeswap: for binance smart chain
+    oneinch: avalanche network
+    jupiter sdk: for solana
+    """
 
-    def __init__(self, chat_id: int):
-        self.w3 = Web3(Web3.WebsocketProvider(INFURA_WS_URL))
+    def __init__(self, chat_id: int, network: str = "ETH"):
+        provider = INFURA_HTTP_URL
+        if network == "ETH":
+            provider = INFURA_HTTP_URL
+        elif network == "BSC":
+            provider = BSC_HTTP_URL
+        elif network == "POL":
+            provider = POLYGON_HTTP_URL
+        elif network == "AVL":
+            provider = AVALANCHE_HTTP_URL
+        self.w3 = Web3(Web3.HTTPProvider(f"{provider}"))
         self.w3.middleware_onion.inject(geth_poa_middleware, layer=0)
         self.bot = bot
+        self.network_sn = network
         self.chat_id = chat_id
         if not self.w3.is_connected():
             LOGGER.error("Connection Error")
             raise Exception("Unable to connect to the RPC network")
 
-    async def copytrade(self, watcher_private_key: str, target_address: str, poll_interval: float = 10.0) -> None:
+    async def copytrade(
+        self,
+        watcher_private_key: str,
+        target_address: str,
+        chain_id: int = 1,
+        poll_interval: float = 10.0,
+    ) -> None:
         """
         Watch for trades from the target_address and mirror them in the watcher wallet.
 
@@ -170,7 +209,7 @@ class WsCryptoCopyTrader:
             for event in event_filter.get_new_entries():
                 LOGGER.debug(f"New event found: {event}")
                 await handle_event(event)
-            await asyncio.sleep(poll_interval) 
+            await asyncio.sleep(poll_interval)
 
     async def mirror_trade(self, tx_hash: str, watcher_account: any) -> None:
         """
@@ -186,7 +225,38 @@ class WsCryptoCopyTrader:
             token_address = tx_details["to"]
             amount = tx_details["value"]
 
+            wallet: UserWallet = await WalletData.get_wallet_by_id(self.chat_id)
+            network: Network = [
+                network for network in Networks if network.sn == self.network_sn
+            ][0]
+            preset: Optional[Presets] = await PresetsData.get_presets_by_id(
+                self.chat_id
+            )
+            tradable_percentage = (
+                preset.balance_tradable if preset is not None else 0.25
+            )
+
+            if network.name == "solana":
+                await self.bot.send_message(
+                    chat_id=self.chat_id,
+                    text="We do not copy trade with solana wallet for now",
+                    reply_markup=setKeyboard(auth_start_buttons),
+                    parse_mode="HTML",
+                )
+                await self.wait_for_receipt("error")
+
+
+            balance = await ETHWallet(network.sn).get_token_balance(
+                watcher_account.address, token_address
+            )
+
+            token_metadata = await TokenMetadata().get_token_symbol_by_contract(
+                token_address
+            )
             # Build and send the transaction
+            amount = (
+                balance * tradable_percentage
+            ) * 10**token_metadata.decimal.ethereum
             nonce = self.w3.eth.get_transaction_count(watcher_account.address)
             gas_price = self.w3.eth.gas_price
 
@@ -217,7 +287,8 @@ TO          | {token_address}
 </code>
 🔗 <a href="https://etherscan.io/tx/{tx_hash.hex()}">Transaction Hash</a>
             """
-            self.bot.send_message(
+
+            await self.bot.send_message(
                 chat_id=self.chat_id,
                 text=copy_message,
                 reply_markup=setKeyboard(auth_start_buttons),
@@ -233,7 +304,7 @@ TO          | {token_address}
 There was an error copying similar trade from your whale:
 ℹ Reason: <b>{e}</b>
             """
-            self.bot.send_message(
+            await self.bot.send_message(
                 chat_id=self.chat_id,
                 text=copy_message,
                 reply_markup=setKeyboard(auth_start_buttons),
@@ -248,6 +319,8 @@ There was an error copying similar trade from your whale:
             tx_hash (str): The transaction hash.
         """
         while True:
+            if tx_hash == "error":
+                break
             receipt = self.w3.eth.get_transaction_receipt(tx_hash)
             if receipt:
                 if receipt.status == 1:

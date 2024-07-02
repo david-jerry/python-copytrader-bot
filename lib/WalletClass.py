@@ -1,9 +1,12 @@
+import base64
 from datetime import datetime
 from decimal import Decimal
 import json
+import time
 from mnemonic import Mnemonic
 import requests
 from web3 import Web3
+from bip_utils import Bip39SeedGenerator, Bip44Coins, Bip44, base58, Bip44Changes
 from web3.contract import Contract
 from eth_account import Account
 import secrets
@@ -16,15 +19,256 @@ from lib.GetDotEnv import (
     ETHERSCAN_API,
     INFURA_HTTP_URL,
     POLYGON_HTTP_URL,
+    QUICKNODE_HTTP,
 )
 from lib.Logger import LOGGER
+from lib.MultiChainWalletGenerator import MultiChainWalletGenerator
+from lib.TokenMetadata import TokenMetadata
+from lib.Types import TokenInfo
 from models.CoinsModel import Coins, CurrentPrice, MarketCap, Platform
 
+from solana.rpc.async_api import AsyncClient
+from solders.message import Message, MessageAddressTableLookup, MessageHeader, MessageV0, to_bytes_versioned  # type: ignore
+from solders.signature import Signature  # type: ignore
+from solders.pubkey import Pubkey  # type: ignore
+from solders.keypair import Keypair  # type: ignore
+from solders.transaction import VersionedTransaction  # type: ignore
+
+from solana.rpc.types import TxOpts, TokenAccountOpts
+from solana.rpc.async_api import AsyncClient
+from solana.rpc.commitment import Processed
+
+from jupiter_python_sdk.jupiter import Jupiter, Jupiter_DCA
+
 ERC20_ABI = json.loads(
-    '[{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"}]'
+    """
+    [
+        {
+            "constant": true,
+            "inputs": [],
+            "name": "name",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "string"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "constant": false,
+            "inputs": [
+                {
+                    "name": "_spender",
+                    "type": "address"
+                },
+                {
+                    "name": "_value",
+                    "type": "uint256"
+                }
+            ],
+            "name": "approve",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "constant": true,
+            "inputs": [],
+            "name": "totalSupply",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "constant": false,
+            "inputs": [
+                {
+                    "name": "_from",
+                    "type": "address"
+                },
+                {
+                    "name": "_to",
+                    "type": "address"
+                },
+                {
+                    "name": "_value",
+                    "type": "uint256"
+                }
+            ],
+            "name": "transferFrom",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "constant": true,
+            "inputs": [],
+            "name": "decimals",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint8"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "constant": true,
+            "inputs": [
+                {
+                    "name": "_owner",
+                    "type": "address"
+                }
+            ],
+            "name": "balanceOf",
+            "outputs": [
+                {
+                    "name": "balance",
+                    "type": "uint256"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "constant": true,
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "string"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "constant": false,
+            "inputs": [
+                {
+                    "name": "_to",
+                    "type": "address"
+                },
+                {
+                    "name": "_value",
+                    "type": "uint256"
+                }
+            ],
+            "name": "transfer",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "constant": true,
+            "inputs": [
+                {
+                    "name": "_owner",
+                    "type": "address"
+                },
+                {
+                    "name": "_spender",
+                    "type": "address"
+                }
+            ],
+            "name": "allowance",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "payable": true,
+            "stateMutability": "payable",
+            "type": "fallback"
+        },
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": true,
+                    "name": "owner",
+                    "type": "address"
+                },
+                {
+                    "indexed": true,
+                    "name": "spender",
+                    "type": "address"
+                },
+                {
+                    "indexed": false,
+                    "name": "value",
+                    "type": "uint256"
+                }
+            ],
+            "name": "Approval",
+            "type": "event"
+        },
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": true,
+                    "name": "from",
+                    "type": "address"
+                },
+                {
+                    "indexed": true,
+                    "name": "to",
+                    "type": "address"
+                },
+                {
+                    "indexed": false,
+                    "name": "value",
+                    "type": "uint256"
+                }
+            ],
+            "name": "Transfer",
+            "type": "event"
+        }
+    ]
+    """
 )
 
-WETH = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6"
+UNISWAP_TOKEN_ADDRESS = "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
 uniswap_contract = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
 uniswap_abi = json.loads(
     """
@@ -39,9 +283,353 @@ oneinch_abi = json.loads(
 )
 
 
-class CryptoWallet:
-    def __init__(self, network: str = "ETH"):
-        provider = INFURA_HTTP_URL
+class SolanaWallet:
+    def __init__(self) -> None:
+        self.async_client = AsyncClient(QUICKNODE_HTTP)
+        self.program_id = "TokenkegQfeZyiNwAJbNbGKPFCWuBvf9Ss623VQ5DA"
+
+    async def generate_multi_chain_wallet(
+        self,
+        mnemonic: str = None,
+        private_key_hex: str = None,
+        coin_type=Bip44Coins.SOLANA,
+        password="",
+    ) -> tuple:
+        """
+        Generates a wallet for a specified chain using the MultiChainWalletGenerator class.
+
+        This function provides a convenient wrapper for creating wallets using the `MultiChainWalletGenerator` class.
+        It accepts optional arguments for a mnemonic phrase, private key in hex format, desired coin type, and password for encryption.
+
+        Args:
+            mnemonic (str, optional): A 12-word BIP39 mnemonic phrase (default: None).
+            private_key_hex (str, optional): A private key in hex format (default: None). Provide either mnemonic or private key.
+            coin_type (Bip44Coins, optional): The desired coin type for the wallet (default: Bip44Coins.ETHEREUM).
+            password (str, optional): A password to encrypt the mnemonic (default: "").
+
+        Returns:
+            tuple: A tuple containing the public address (str), private key (str), and a boolean indicating if it's a Solana chain (True) or not (False).
+
+        Raises:
+            ValueError: If both mnemonic and private_key_hex are provided or neither are provided.
+        """
+
+        # if not mnemonic and not private_key_hex:
+        #     raise ValueError(
+        #         "Please provide either a mnemonic phrase or a private key in hex format."
+        #     )
+
+        wallet_data = await MultiChainWalletGenerator().generate_wallet(
+            coin_type, sol_mnemonic=mnemonic, sol_private_key_hex=private_key_hex, password=password
+        )
+        return wallet_data
+
+    async def connect_jupiter(self, private_key: str) -> Jupiter:
+        """
+        Connects to Jupiter using the provided private key.
+
+        Args:
+            private_key (Keypair): The private key for the Solana wallet.
+
+        Returns:
+            Jupiter: The Jupiter instance connected with the provided private key.
+
+        Raises:
+            ConnectionError: If the connection to Jupiter fails.
+        """
+        jupiter = Jupiter(self.async_client, Keypair.from_base58_string(private_key))
+        if not jupiter.rpc.is_connected:
+            raise ConnectionError("Failed to connect to Jupiter")
+        return jupiter
+
+    async def execute_swap(
+        self,
+        private_key: str,
+        input_mint: str,
+        output_mint: str,
+        amount: int,
+        slippage_bps: int = 50,
+    ) -> str:
+        """
+        Executes a token swap on Solana using Jupiter.
+
+        Args:
+            private_key (Keypair): The private key for the Solana wallet.
+            input_mint (str): The mint address of the input token.
+            output_mint (str): The mint address of the output token.
+            amount (int): The amount of input tokens to swap.
+            slippage_bps (int): The allowed slippage in basis points.
+
+        Returns:
+            str: The transaction link on solana of the executed swap.
+
+        Raises:
+            Exception: If there is an error during the swap process.
+        """
+        pk = Keypair.from_base58_string(private_key)
+        jupiter = await self.connect_jupiter(private_key)
+
+        token_bal = await self.get_token_balance(input_mint)
+        if token_bal < amount:
+            LOGGER.debug("Insufficient amount to complete a swap")
+            return f"""
+<b>Insufficient Balance</b>
+---------------------------
+You do not have the total amount to complete the swap. Please top up your wallet to complete the transaction
+        """
+
+        transaction_data = await jupiter.swap(
+            input_mint=input_mint,
+            output_mint=output_mint,
+            amount=amount,
+            slippage_bps=slippage_bps,
+        )
+
+        raw_transaction = VersionedTransaction.from_bytes(
+            base64.b64decode(transaction_data)
+        )
+        message = raw_transaction.message
+        signature = pk.sign_message(to_bytes_versioned(message))
+        signed_txn = VersionedTransaction.populate(message, [signature])
+
+        opts = TxOpts(skip_preflight=False, preflight_commitment=Processed)
+        result = await self.async_client.send_raw_transaction(
+            txn=bytes(signed_txn), opts=opts
+        )
+        tokenInDetails = await TokenMetadata().get_token_symbol_by_contract(input_mint)
+        tokenOutDetails = await TokenMetadata().get_token_symbol_by_contract(
+            output_mint
+        )
+
+        json_response = json.loads(result.to_json())
+        transaction_id = json_response["result"]
+        LOGGER.debug(json_response)
+        LOGGER.info(
+            f"Transaction sent: https://explorer.solana.com/tx/{transaction_id}"
+        )
+        return f"""
+<code>
+<b>Swap Successful</b>
+--------------------------
+🏦 Swapped | {tokenInDetails.symbol} for {tokenOutDetails.symbol}
+---------------------------
+</code>
+----------------------------
+<a href='https://explorer.solana.com/tx/{transaction_id}'>Transaction ID: {transaction_id}</a>
+            """
+
+    async def open_limit_order(
+        self,
+        private_key: Keypair,
+        input_mint: str,
+        output_mint: str,
+        in_amount: int,
+        out_amount: int,
+    ) -> str:
+        """
+        Opens a limit order on Jupiter for swapping tokens.
+
+        This function connects to the Jupiter API using the provided private key, creates a limit order to swap `in_amount` of `input_mint` token for `out_amount` of `output_mint` token, submits the transaction to the Solana network, and returns the transaction ID.
+
+        **Note:** This function assumes you have already established a connection to the Jupiter API and Solana network through other methods.
+
+        Args:
+            private_key (Keypair): The private key used to sign the transaction.
+            input_mint (str): The mint address of the token being offered (input token).
+            output_mint (str): The mint address of the token being desired (output token).
+            in_amount (int): The amount of the input token to offer.
+            out_amount (int): The desired amount of the output token.
+
+        Returns:
+            str: The transaction ID of the submitted order.
+        """
+        jupiter = await self.connect_jupiter(private_key)
+
+        transaction_data = await jupiter.open_order(
+            input_mint=input_mint,
+            output_mint=output_mint,
+            in_amount=in_amount,
+            out_amount=out_amount,
+        )
+
+        raw_transaction = VersionedTransaction.from_bytes(
+            base64.b64decode(transaction_data["transaction_data"])
+        )
+        signature = private_key.sign_message(raw_transaction.message.serialize())
+        signed_txn = VersionedTransaction.populate(
+            raw_transaction.message, [signature, transaction_data["signature2"]]
+        )
+
+        opts = TxOpts(skip_preflight=False, preflight_commitment=Processed)
+        result = await self.async_client.send_raw_transaction(
+            txn=bytes(signed_txn), opts=opts
+        )
+
+        transaction_id = json.loads(result.to_json())["result"]
+        LOGGER.debug(
+            f"Transaction sent: https://explorer.solana.com/tx/{transaction_id}"
+        )
+        return f"Limit Order Created: https://explorer.solana.com/tx/{transaction_id}"
+
+    async def get_balance(self, pubkey: Pubkey) -> int:
+        """
+            Fetches the balance associated with a provided Solana public key.
+
+        This asynchronous method retrieves the balance information for a given Solana public key using the connected Solana client. It utilizes the client's `get_balance` method to retrieve the balance data.
+
+        Args:
+            pubkey (Pubkey): The Solana public key for which to retrieve the balance.
+
+        Returns:
+            int: the balance in lamport which is the smallest unit of tokens in solana
+        """
+        balance = await self.async_client.get_balance(pubkey)
+        return balance.value
+
+    async def get_token_balance(self, token_pubkey: Pubkey) -> int:
+        """
+        Retrieves the balance of a specific SPL token associated with a provided public key.
+
+        This asynchronous method fetches the balance information for a given Solana token
+        public key (`token_pubkey`) using the connected Solana client. It utilizes the
+        client's `get_token_account_balance` method to retrieve the balance data
+        and returns the actual token amount as an integer.
+
+        Args:
+            token_pubkey (Pubkey): The public key of the SPL token account for which to retrieve the balance.
+
+        Returns:
+            int: The balance of the specified token as an integer, representing the number of tokens in the account.
+
+        Raises:
+            SolanaException: If there's an error fetching the balance information
+            from the Solana network.
+        """
+        balance = await self.async_client.get_token_account_balance(token_pubkey)
+        return int(balance.value.amount)
+
+    async def get_token_supply(self, token_pubkey: Pubkey) -> int:
+        """
+        Retrieves the total supply of a specific SPL token.
+
+        This asynchronous method fetches the total supply information for a given Solana token public key (`token_pubkey`) using the connected Solana client. It utilizes the client's `get_token_supply` method to retrieve the supply data and returns the total token supply as an integer.
+
+        Args:
+            token_pubkey (Pubkey): The public key of the SPL token for which to retrieve the total supply.
+
+        Returns:
+            int: The total supply of the specified token as an integer, representing the total number of tokens in existence.
+
+        Raises:
+            SolanaException: If there's an error fetching the supply information from the Solana network.
+        """
+        supply = await self.async_client.get_token_supply(token_pubkey)
+        return int(supply.value.amount)
+
+    async def get_all_tokens_for_wallet(self, owner_pubkey: Pubkey):
+        """
+        Retrieves all SPL token accounts associated with a provided wallet address.
+
+        This asynchronous method fetches information about all token accounts owned by a specific Solana wallet address (`owner_pubkey`) using the connected Solana client. It utilizes the client's  `get_token_accounts_by_delegate` method with `program_id` set to the configured program ID (likely the SPL Token program ID) to filter for token accounts. The return value includes details about the retrieved token accounts.
+
+        Args:
+            owner_pubkey (Pubkey): The public key of the Solana wallet address for which to retrieve associated token accounts.
+
+        Returns:
+            Any: The raw data returned by the Solana client's `get_token_accounts_by_delegate` method, typically a dictionary-like  object containing information about the retrieved token accounts.
+
+        Raises:
+            SolanaException: If there's an error fetching the token account information from the Solana network.
+        """
+
+        tokens = await self.async_client.get_token_accounts_by_delegate(
+            owner_pubkey, TokenAccountOpts(program_id=self.program_id)
+        )
+        return tokens.value
+
+    async def convert_to_lamports(self, token_amount: float, decimals: int) -> int:
+        """
+        Converts a token amount to its equivalent value in lamports.
+
+        This asynchronous function takes a token amount (`token_amount`) as a float
+        and the number of decimal places (`decimals`) for the token and returns the
+        equivalent value in lamports (SOL's smallest unit).
+
+        Args:
+            token_amount (float): The amount of tokens to convert.
+            decimals (int): The number of decimal places for the token.
+
+        Returns:
+            int: The equivalent value of the token amount in lamports.
+
+        Raises:
+            ValueError: If the provided decimals value is negative.
+        """
+
+        if decimals < 0:
+            raise ValueError("Decimals cannot be negative")
+        lamports = int(token_amount * (10**decimals))
+        return lamports
+
+    async def convert_from_lamports(self, lamport_amount: int, decimals: int) -> float:
+        """
+        Converts a lamports amount to its equivalent token value.
+
+        This asynchronous function takes a lamports amount (`lamport_amount`) as an integer
+        and the number of decimal places (`decimals`) for the token and returns the
+        equivalent value as a float representing the number of tokens.
+
+        Args:
+            lamport_amount (int): The amount in lamports to convert to token value.
+            decimals (int): The number of decimal places for the token.
+
+        Returns:
+            float: The equivalent value of the lamport amount as a number of tokens.
+
+        Raises:
+            ValueError: If the provided decimals value is negative.
+        """
+
+        if decimals < 0:
+            raise ValueError("Decimals cannot be negative")
+        token_amount = float(lamport_amount / (10**decimals))
+        return token_amount
+
+    async def check_balance_for_swap(
+        self,
+        owner_pubkey: Pubkey,
+        amount: int,
+        decimals: int,
+        input_mint: str = "SOL",
+    ) -> bool:
+        """
+        Checks if the token balance or SOL balance is enough to complete a swap.
+
+        Args:
+            owner_pubkey (Pubkey): The public key of the owner wallet.
+            input_mint (str): The mint address of the input token.
+            amount (int): The amount of input tokens needed for the swap in lamports.
+            decimals (int): The number of decimal places for the input token.
+
+        Returns:
+            bool: True if the balance is sufficient, False otherwise.
+        """
+        if input_mint in ["SOL", "So11111111111111111111111111111111111111112"]:
+            # Check SOL balance
+            sol_balance = await self.get_balance(owner_pubkey)
+            return sol_balance >= amount
+        else:
+            # Check SPL token balance
+            token_pubkey = Pubkey(input_mint)
+            token_balance = await self.get_token_balance(token_pubkey)
+            required_balance = await self.convert_to_lamports(amount, decimals)
+            return token_balance >= required_balance
+
+
+class ETHWallet:
+    def __init__(self, network: str = "ETH") -> None:
+        if network == "SOL":
+            provider = INFURA_HTTP_URL
         if network == "ETH":
             provider = INFURA_HTTP_URL
         elif network == "BSC":
@@ -50,28 +638,98 @@ class CryptoWallet:
             provider = POLYGON_HTTP_URL
         elif network == "AVL":
             provider = AVALANCHE_HTTP_URL
-        self.w3 = Web3(Web3.HTTPProvider(f"{provider}"))
+
+        self.w3: Web3 = Web3(Web3.HTTPProvider(f"{provider}"))
+
         if not self.w3.is_connected():
             LOGGER.info("Connection Error")
             raise ConnectionError("Failed to connect to the Ethereum network")
-        self.uniswap_router = self.w3.eth.contract(
+        self.uniswap_router: type[Contract] = self.w3.eth.contract(
             address=uniswap_contract, abi=uniswap_abi
         )
-        chain: Network  = [chain for chain in Networks if chain.sn == network][0]
-        self.chain = chain.id
 
-    async def convert_to_wei(self, amount: float):
-        return self.w3.to_wei(amount, 'ether')
+        self.network: Network = [chain for chain in Networks if chain.sn == network][0]
+        self.chain = self.network.id
 
-    async def convert_from_wei(self, amount: float):
-        return self.w3.from_wei(amount, 'ether')
+    async def convert_to_wei(self, amount_eth: float) -> int:
+        """
+        Converts a floating-point number of Ether to Wei.
 
-    async def generate_private_key(self):
-        private_key = f"0x{secrets.token_hex(32)}"
-        LOGGER.info(f"Generated private key: {private_key}")
-        return private_key
+        This function utilizes the Web3.py library's `to_wei` method to convert the provided `amount` in Ether to its corresponding value in Wei.
+
+        Args:
+            amount (amount_eth): The amount of Ether to convert.
+
+        Returns:
+            int: The converted amount in Wei (integer value).
+        """
+
+        return int(self.w3.to_wei(amount_eth, "ether"))
+
+    async def convert_from_wei(self, amount_wei: int) -> float:
+        """
+        Converts a value in Wei to Ether.
+
+        This function utilizes the Web3.py library's `from_wei` method to convert the provided `amount` in Wei to its corresponding value in Ether.
+
+        Args:
+            amount_wei (int): The amount in Wei to convert.
+
+        Returns:
+            float: The converted amount in Ether.
+        """
+
+        return float(self.w3.from_wei(amount_wei, "ether"))
+
+    async def generate_multi_chain_wallet(
+        self,
+        mnemonic: str = None,
+        private_key_hex: str = None,
+        coin_type=Bip44Coins.ETHEREUM,
+        password="",
+    ) -> tuple:
+        """
+        Generates a wallet for a specified chain using the MultiChainWalletGenerator class.
+
+        This function provides a convenient wrapper for creating wallets using the `MultiChainWalletGenerator` class.
+        It accepts optional arguments for a mnemonic phrase, private key in hex format, desired coin type, and password for encryption.
+
+        Args:
+            mnemonic (str, optional): A 12-word BIP39 mnemonic phrase (default: None).
+            private_key_hex (str, optional): A private key in hex format (default: None). Provide either mnemonic or private key.
+            coin_type (Bip44Coins, optional): The desired coin type for the wallet (default: Bip44Coins.ETHEREUM).
+            password (str, optional): A password to encrypt the mnemonic (default: "").
+
+        Returns:
+            tuple: A tuple containing the public address (str), private key (str), and a boolean indicating if it's a Solana chain (True) or not (False).
+
+        Raises:
+            ValueError: If both mnemonic and private_key_hex are provided or neither are provided.
+        """
+
+        # if not mnemonic and not private_key_hex:
+        #     raise ValueError(
+        #         "Please provide either a mnemonic phrase or a private key in hex format."
+        #     )
+
+        wallet_data = await MultiChainWalletGenerator().generate_wallet(
+            coin_type, mnemonic=mnemonic, private_key_hex=private_key_hex, password=password
+        )
+        return wallet_data
 
     async def convert_to_checksum(self, address: str) -> str:
+        """
+        Converts an Ethereum address to its checksum format.
+
+        This function utilizes the Web3.py library's `to_checksum_address` method to convert the provided `address` to its checksum-encoded format.
+
+        Args:
+            address (str): The Ethereum address to convert.
+
+        Returns:
+            str: The checksum-encoded Ethereum address.
+        """
+
         return self.w3.to_checksum_address(address)
 
     async def validate_address(self, address: str) -> bool:
@@ -85,7 +743,7 @@ class CryptoWallet:
             bool: True if the address is valid, False otherwise.
 
         Example:
-            is_valid = CryptoWallet.validate_address("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
+            is_valid = ETHWallet.validate_address("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
             print(is_valid)  # Output: True or False
         """
         return self.w3.is_checksum_address(address)
@@ -126,52 +784,7 @@ class CryptoWallet:
         except Exception:
             return False
 
-    async def create_wallet(self, password: str) -> Dict[str, Any]:
-        """
-        Create a new Ethereum wallet.
-
-        Args:
-            password (str): The password to encrypt the wallet.
-
-        Returns:
-            Dict[str, Any]: The wallet details including private key, address, and encrypted key.
-
-        Example:
-            wallet = CryptoWallet.create_wallet("my_secure_password")
-            print(wallet["address"])  # Output: Ethereum address
-        """
-        LOGGER.info("Generating wallet...")
-        private_key = await self.generate_private_key()
-        account = Account.from_key(private_key)
-        encrypted_key = Account.encrypt(account.key.hex(), str(password))
-        LOGGER.info(f"Encrypted key: {encrypted_key}")
-        return {
-            "user_id": str(password),
-            "pub_key": account.address,
-            "sec_key": account.key.hex(),
-            "enc_key": encrypted_key,
-        }
-
-    async def import_wallet(self, encrypted_key: str, password: str) -> str:
-        """
-        Import an Ethereum wallet.
-
-        Args:
-            encrypted_key (str): The encrypted key of the wallet.
-            password (str): The password to decrypt the wallet.
-
-        Returns:
-            str: The Ethereum address of the imported wallet.
-
-        Example:
-            address = CryptoWallet.import_wallet(encrypted_key, "my_secure_password")
-            print(address)  # Output: Ethereum address
-        """
-        decrypted_key = Account.decrypt(encrypted_key, password)
-        account = self.w3.eth.account.from_key(decrypted_key)
-        return account.address
-
-    async def get_balance(self, address: str) -> Decimal:
+    async def get_balance(self, address: str) -> float:
         """
         Get the balance of an Ethereum address.
 
@@ -179,14 +792,56 @@ class CryptoWallet:
             address (str): The Ethereum address to check the balance of.
 
         Returns:
-            Decimal: The balance in Ether.
+            float: The balance in Ether.
 
         Example:
-            balance = CryptoWallet.get_balance("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
+            balance = ETHWallet.get_balance("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
             print(balance)  # Output: 12.345 (example balance)
         """
         balance = self.w3.eth.get_balance(address)
-        return self.w3.from_wei(balance, "ether")
+        return float(self.w3.from_wei(balance, "ether"))
+
+    async def get_token_balance(self, address: str, token_address: str) -> float:
+        """
+        Get the balance of a specific token held by an Ethereum address.
+
+        Args:
+            address (str): The Ethereum address to check the token balance of.
+            token_address (str): The contract address of the token.
+
+        Returns:
+            Decimal: The balance of the token held by the address (in the token's units).
+
+        Example:
+            token_balance = await ETHWallet.get_token_balance(
+                "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+                "0x..."  # Replace with the actual token contract address
+            )
+            print(token_balance)  # Output: 1000.0 (example token balance)
+        """
+
+        # Get the ERC20 token contract ABI (Application Binary Interface)
+        # You'll need to obtain the ABI for the specific token you're interested in.
+        # This can often be found on the token's website or Etherscan page.
+        token: TokenInfo = await TokenMetadata().get_token_symbol_by_contract(
+            token_address, self.network.name
+        )
+        token_meta: Optional[Coins] = await TokenMetadata().get_token_details(
+            token.id, token.symbol
+        )
+
+        # Create an ERC20 contract instance using the ABI and token address
+        token_contract: Contract = self.w3.eth.contract(
+            address=token_address, abi=token_meta.abi
+        )
+
+        # Call the balanceOf method of the token contract to get the balance
+        balance = await token_contract.functions.balanceOf(address).call()
+
+        # Convert the balance from wei to the token's units (depends on the token)
+        return float(balance) / (
+            10 ** (token.decimal.ethereum or token_contract.functions.decimals().call())
+        )
 
     async def estimate_gas(self, transaction: Dict[str, Any]) -> int:
         """
@@ -201,9 +856,9 @@ class CryptoWallet:
         Example:
             transaction = {
                 "to": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-                "value": CryptoWallet.w3.to_wei(0.1, "ether")
+                "value": ETHWallet.w3.to_wei(0.1, "ether")
             }
-            gas = CryptoWallet.estimate_gas(transaction)
+            gas = ETHWallet.estimate_gas(transaction)
             print(gas)  # Output: 21000 (example gas estimate)
         """
         return self.w3.eth.estimate_gas(transaction)
@@ -216,7 +871,7 @@ class CryptoWallet:
             int: The current gas price in Wei.
 
         Example:
-            gas_price = CryptoWallet.get_gas_price()
+            gas_price = ETHWallet.get_gas_price()
             print(gas_price)  # Output: 20000000000 (example gas price)
         """
         return self.w3.eth.gas_price
@@ -244,7 +899,7 @@ class CryptoWallet:
 
         Example:
             abi = [...]  # Contract ABI
-            tx_url = CryptoWallet.send_token(abi, "0xContractAddress", "0xSenderPrivateKey", "0xRecipientAddress", 1.0)
+            tx_url = ETHWallet.send_token(abi, "0xContractAddress", "0xSenderPrivateKey", "0xRecipientAddress", 1.0)
             print(tx_url)  # Output: Etherscan transaction URL
         """
 
@@ -262,21 +917,27 @@ class CryptoWallet:
         base_fee_per_gas = (
             latest_block.baseFeePerGas
         )  # Base fee in the latest block (in wei)
-        max_priority_fee_per_gas = self.w3.to_wei(
-            1, "gwei"
+        max_priority_fee_per_gas = (
+            self.w3.eth.max_priority_fee
         )  # Priority fee to include the transaction in the block
         max_fee_per_gas = (
             5 * base_fee_per_gas
         ) + max_priority_fee_per_gas  # Maximum amount you’re willing to pay
-
 
         tx = {
             "nonce": nonce,
             "gas": gas_estimate,
             "maxFeePerGas": max_fee_per_gas,
             "maxPriorityFeePerGas": max_priority_fee_per_gas,
-            "chainId": self.chain
+            "chainId": self.chain,
         }
+        if self.network.sn == "BSC":
+            tx = {
+                "nonce": nonce,
+                "gas": 2100000,
+                "gasPrice": await self.get_gas_price(),
+                "chainId": self.chain,
+            }
 
         transaction = contract.functions.transfer(
             recipient_address, token_amount
@@ -288,7 +949,7 @@ class CryptoWallet:
         try:
             tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
             tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-            if tx_receipt.status:
+            if tx_receipt["status"] == 1:
                 LOGGER.info("Transaction successful!")
                 return f"https://etherscan.io/tx/{tx_hash.hex()}"
             else:
@@ -296,12 +957,12 @@ class CryptoWallet:
                 return "Transaction failed"
         except Exception as e:
             LOGGER.error(e)
-            if 'insufficient funds for gas' in str(e):
+            if "insufficient funds for gas" in str(e):
                 return "Insufficient Balance"
             return str(e)
 
-    async def send_crypto(
-        self, sender_private_key: str, recipient_address: str, amount_ether: Decimal
+    async def send_eth(
+        self, sender_private_key: str, recipient_address: str, amount_ether: float
     ) -> str:
         """
         Send Ether to a recipient address.
@@ -315,7 +976,7 @@ class CryptoWallet:
             str: The transaction URL on Etherscan.
 
         Example:
-            tx_url = CryptoWallet.send_crypto("0xSenderPrivateKey", "0xRecipientAddress", Decimal("0.1"))
+            tx_url = ETHWallet.send_crypto("0xSenderPrivateKey", "0xRecipientAddress", Decimal("0.1"))
             print(tx_url)  # Output: Etherscan transaction URL
         """
         sender_account = self.w3.eth.account.from_key(sender_private_key)
@@ -326,11 +987,11 @@ class CryptoWallet:
         base_fee_per_gas = (
             latest_block.baseFeePerGas
         )  # Base fee in the latest block (in wei)
-        max_priority_fee_per_gas = self.w3.to_wei(
-            1, "gwei"
+        max_priority_fee_per_gas = (
+            self.w3.eth.max_priority_fee
         )  # Priority fee to include the transaction in the block
         max_fee_per_gas = (
-            5 * base_fee_per_gas
+            50 * base_fee_per_gas
         ) + max_priority_fee_per_gas  # Maximum amount you’re willing to pay
 
         tx = {
@@ -340,15 +1001,22 @@ class CryptoWallet:
             "gas": 21000,
             "maxFeePerGas": max_fee_per_gas,
             "maxPriorityFeePerGas": max_priority_fee_per_gas,
-            "chainId": self.chain
+            "chainId": self.chain,
         }
+        if self.network.sn == "BSC":
+            tx = {
+                "nonce": nonce,
+                "gas": 2100000,
+                "gasPrice": await self.get_gas_price(),
+                "chainId": self.chain,
+            }
 
         signed_tx = self.w3.eth.account.sign_transaction(tx, sender_account.key)
 
         try:
             tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
             tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-            if tx_receipt.status:
+            if tx_receipt["status"] == 1:
                 LOGGER.info("Transaction successful!")
                 return f"https://etherscan.io/tx/{tx_hash.hex()}"
             else:
@@ -356,11 +1024,11 @@ class CryptoWallet:
                 return "Transaction failed"
         except Exception as e:
             LOGGER.error(e)
-            if 'insufficient funds for gas' in str(e):
+            if "insufficient funds for gas" in str(e):
                 return "Insufficient Balance"
             return str(e)
 
-    async def check_balances(
+    async def check_balance_for_swap(
         self,
         user_address: str,
         token_address: str,
@@ -368,6 +1036,27 @@ class CryptoWallet:
         gas_price_gwei=20,
         gas_limit=21000,
     ):
+        """
+        Asynchronously checks if a user has sufficient balance for gas and token transfer on the Ethereum network.
+
+        This function performs the following checks:
+
+        1. Converts the provided user and token addresses to checksum format for Ethereum compatibility.
+        2. Fetches the user's ETH balance and the token balance for the specified address.
+        3. Calculates the gas cost in Wei based on the provided gas price (in Gwei) and gas limit.
+        4. Verifies if the user has enough ETH to cover the gas cost.
+        5. Verifies if the user has enough tokens of the specified address to cover the transfer amount.
+
+        Args:
+            user_address (str): The address of the user initiating the transfer.
+            token_address (str): The contract address of the token being transferred.
+            amount_to_transfer (int): The amount of tokens to be transferred (in units of the token).
+            gas_price_gwei (int, optional): The gas price in Gwei (default: 20).
+            gas_limit (int, optional): The gas limit for the transaction (default: 21000).
+
+        Returns:
+            bool: True if the user has sufficient balance for both gas and token transfer, False otherwise.
+        """
         user_address = await self.convert_to_checksum(user_address)
         token_address = await self.convert_to_checksum(token_address)
 
@@ -381,7 +1070,7 @@ class CryptoWallet:
         amount_to_transfer_wei = self.w3.to_wei(amount_to_transfer, "ether")
 
         # Calculate gas cost in wei
-        gas_price_wei = gas_price_gwei #self.w3.to_wei(float(gas_price_gwei), "gwei")
+        gas_price_wei = gas_price_gwei  # self.w3.to_wei(float(gas_price_gwei), "gwei")
         gas_cost = gas_price_wei * gas_limit
 
         # Check if user has enough ETH for gas
@@ -401,16 +1090,14 @@ class CryptoWallet:
         print("Sufficient balance for both gas and token transfer.")
         return True
 
-    async def swap_tokens_uniswap(
+    async def swap_tokens_with_uniswap(
         self,
         sender_private_key: str,
         token_in: str,
         token_out: str,
-        amount_in: float,
-        amount_out_min: float,
-        deadline: int = 5000,
-        router_address: str = uniswap_contract,
-        router_abi: Any = uniswap_abi,
+        amount_in_wei: int,
+        amount_out_min_wei: int,
+        deadline: int = 3000,
     ) -> str:
         """
         Swap tokens using Uniswap.
@@ -430,26 +1117,22 @@ class CryptoWallet:
 
         Example:
             router_abi = [...]  # Uniswap Router ABI
-            tx_url = CryptoWallet.swap_tokens_uniswap("0xSenderPrivateKey", "0xTokenIn", "0xTokenOut", 1.0, 0.9, 300, "0xRouterAddress", router_abi)
+            tx_url = ETHWallet.swap_tokens_uniswap("0xSenderPrivateKey", "0xTokenIn", "0xTokenOut", 1.0, 0.9, 300, "0xRouterAddress", router_abi)
             print(tx_url)  # Output: Etherscan transaction URL
         """
         sender_account = self.w3.eth.account.from_key(sender_private_key)
         nonce = self.w3.eth.get_transaction_count(sender_account.address)
-        amount_in_wei = self.w3.to_wei(amount_in, "ether")
-        amount_out_min_wei = self.w3.to_wei(amount_out_min, "ether")
         path = [token_in, token_out]
 
-        router_contract: type[Contract] = self.w3.eth.contract(address=router_address, abi=router_abi)
         deadline_timestamp = self.w3.eth.get_block("latest")["timestamp"] + deadline
-        gas_price = await self.get_gas_price()
 
         # Get and determine gas parameters
         latest_block = self.w3.eth.get_block("latest")
         base_fee_per_gas = (
             latest_block.baseFeePerGas
         )  # Base fee in the latest block (in wei)
-        max_priority_fee_per_gas = self.w3.to_wei(
-            1, "gwei"
+        max_priority_fee_per_gas = (
+            self.w3.eth.max_priority_fee
         )  # Priority fee to include the transaction in the block
         max_fee_per_gas = (
             5 * base_fee_per_gas
@@ -460,18 +1143,25 @@ class CryptoWallet:
             "gas": 2100000,
             "maxFeePerGas": max_fee_per_gas,
             "maxPriorityFeePerGas": max_priority_fee_per_gas,
-            "chainId": self.chain
+            "chainId": self.chain,
         }
+        if self.network.sn == "BSC":
+            tx = {
+                "nonce": nonce,
+                "gas": 2100000,
+                "gasPrice": await self.get_gas_price(),
+                "chainId": self.chain,
+            }
         LOGGER.debug(tx)
-#         can_transfer = await self.check_balances(
-#             sender_account.address, token_in, amount_in, gas_price
-#         )
-#         LOGGER.debug(f"Can Transfer: {can_transfer}")
-#         if not can_transfer:
-#             return """
-# Insufficient Balance for transaction.
-#         """
-        transaction = router_contract.functions.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        #         can_transfer = await self.check_balances(
+        #             sender_account.address, token_in, amount_in, gas_price
+        #         )
+        #         LOGGER.debug(f"Can Transfer: {can_transfer}")
+        #         if not can_transfer:
+        #             return """
+        # Insufficient Balance for transaction.
+        #         """
+        transaction = self.uniswap_router.functions.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amount_in_wei,
             amount_out_min_wei,
             path,
@@ -485,20 +1175,20 @@ class CryptoWallet:
             transaction, sender_account.key
         )
 
-        tokenInDetails = await self.get_token_symbol_by_contract(token_in)
-        tokenOutDetails = await self.get_token_symbol_by_contract(token_out)
+        tokenInDetails = await TokenMetadata().get_token_symbol_by_contract(token_in)
+        tokenOutDetails = await TokenMetadata().get_token_symbol_by_contract(token_out)
 
         try:
             tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
             tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-            if tx_receipt.status:
+            if tx_receipt["status"] == 1:
                 LOGGER.info("Token swap successful!")
                 return f"""
 <code>
 <b>Transaction Successful</b>
 --------------------------
-🏦 Swapped | {tokenInDetails['symbol']} for {tokenOutDetails['symbol']}
-💸 Amount  | {amount_in} for {amount_out_min}
+🏦 Swapped | {tokenInDetails.symbol} for {tokenOutDetails.symbol}
+💸 Amount  | {amount_in_wei / (10**tokenInDetails.decimal)} for {amount_out_min_wei / (10**tokenOutDetails.decimal)}
 ---------------------------
 </code>
 ----------------------------
@@ -509,11 +1199,11 @@ class CryptoWallet:
                 return "Token swap failed"
         except Exception as e:
             LOGGER.error(e)
-            if 'insufficient funds for gas' in str(e):
+            if "insufficient funds for gas" in str(e):
                 return "Insufficient Balance"
             return str(e)
 
-    async def calculate_amount_out(self, amount_in, token_in, token_out):
+    async def calculate_eth_amount_out(self, amount_in: int, token_in: str, token_out: str):
 
         # Path for swapping: [tokenIn, tokenOut]
         path = [token_in, token_out]
@@ -522,195 +1212,8 @@ class CryptoWallet:
 
         # Fetch amounts out
         amounts_out = self.uniswap_router.functions.getAmountsOut(
-            self.w3.to_wei(amount_in, "ether"), path
+            amount_in, path
         ).call()
 
         LOGGER.debug(f"Amount Out: {amounts_out}")
-        return amounts_out[-1]
-
-    async def currency_amount(self, token_id: str) -> Optional[float]:
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {"ids": token_id, "vs_currencies": "usd"}
-        response = requests.get(url, params=params)
-
-        if response.status_code == 200:
-            data = response.json()
-            LOGGER.info(data)
-            price = data[token_id]["usd"]
-            LOGGER.info(price)
-            return float(price)
-        else:
-            LOGGER.info(response.json())
-            return None
-
-    async def get_token_id(self, symbol: str) -> Optional[Coins]:
-        """
-        Get the CoinGecko token ID for a given token symbol.
-
-        Args:
-            symbol (str): The token symbol to search for.
-
-        Returns:
-            Optional[str]: The CoinGecko token ID if found, None otherwise.
-
-        Example:
-            token_id = await CryptoWallet.get_token_id("xrp")
-            print(token_id)  # Output: "ripple"
-        """
-        api_url = "https://api.coingecko.com/api/v3/search"
-        params = {"query": symbol}
-        stored_token: Optional[Coins] = await CoinData.get_coin_by_symbol(symbol)
-
-        if stored_token is not None:
-            LOGGER.debug(f"Stored: {stored_token}")
-            LOGGER.debug(f"Stored Platforms: {stored_token.platforms}")
-
-            if stored_token.platforms.ethereum is not None:
-                return stored_token
-
-        try:
-            response = requests.get(api_url, params=params)
-            response.raise_for_status()
-            data = response.json()
-
-            for coin in data.get("coins", []):
-                if coin["symbol"].lower() == symbol.lower():
-                    token_id: str = coin["id"]
-                    LOGGER.info(f"Found token ID: {token_id} for symbol: {symbol}")
-                    return await self.get_token_details(token_id)
-
-            LOGGER.info(f"No token ID found for symbol: {symbol}")
-            return None
-        except requests.exceptions.RequestException as e:
-            LOGGER.error(f"An error occurred: {e}")
-            return None
-
-    async def get_token_details(self, token_id: str) -> Optional[Coins]:
-        """
-        Get detailed information about a token from CoinGecko.
-
-        Args:
-            token_id (str): The CoinGecko token ID.
-
-        Returns:
-            Optional[Coins]: A Coins object if found, None otherwise.
-        """
-        api_url = f"https://api.coingecko.com/api/v3/coins/{token_id}"
-
-        try:
-            response = requests.get(api_url)
-            response.raise_for_status()
-            data = response.json()
-
-            total_volume = (
-                data.get("market_data", {}).get("total_volume", {}).get("usd")
-            )
-            description = data.get("description", {}).get("en")
-            image_link = data.get("image", {}).get("large")
-            coin_id = data.get("id")
-            symbol = data.get("symbol")
-            name = data.get("name")
-
-            # Extract necessary information
-            platforms = Platform(
-                symbol=symbol,
-                ethereum=data.get("platforms", {}).get("ethereum"),
-                polygon=data.get("platforms", {}).get("polygon-pos"),
-                binance_smart_chain=data.get("platforms", {}).get(
-                    "binance-smart-chain"
-                ),
-                solana=data.get("platforms", {}).get("solana"),
-            )
-
-            if platforms.ethereum:
-                # Fetch the ABI using Etherscan API
-                contract_address = (
-                    platforms.ethereum
-                )  # Example: using Ethereum platform
-                abi = None
-                if contract_address:
-                    abi_url = f"https://api.etherscan.io/api?module=contract&action=getabi&address={contract_address}&apikey={ETHERSCAN_API}"
-                    abi_response = requests.get(abi_url)
-                    if abi_response.status_code == 200:
-                        abi_data = abi_response.json()
-                        if abi_data["status"] == "1":
-                            abi = abi_data["result"]
-                        else:
-                            LOGGER.error(f"Failed to fetch ABI: {abi_data['result']}")
-
-            market_cap = MarketCap(
-                symbol=symbol,
-                USD=data.get("market_data", {}).get("market_cap", {}).get("usd"),
-                AUD=data.get("market_data", {}).get("market_cap", {}).get("aud"),
-                GBP=data.get("market_data", {}).get("market_cap", {}).get("gbp"),
-                NGN=data.get("market_data", {}).get("market_cap", {}).get("ngn"),
-                JPY=data.get("market_data", {}).get("market_cap", {}).get("jpy"),
-                CAD=data.get("market_data", {}).get("market_cap", {}).get("cad"),
-            )
-
-            current_price = CurrentPrice(
-                symbol=symbol,
-                USD=data.get("market_data", {}).get("current_price", {}).get("usd"),
-                AUD=data.get("market_data", {}).get("current_price", {}).get("aud"),
-                GBP=data.get("market_data", {}).get("current_price", {}).get("gbp"),
-                NGN=data.get("market_data", {}).get("current_price", {}).get("ngn"),
-                JPY=data.get("market_data", {}).get("current_price", {}).get("jpy"),
-                CAD=data.get("market_data", {}).get("current_price", {}).get("cad"),
-            )
-
-            total_supply = data.get("market_data", {}).get("total_supply", {})
-
-            token_details = Coins(
-                id=coin_id,
-                symbol=symbol,
-                name=name,
-                platforms=platforms,
-                market_cap=market_cap,
-                current_price=current_price,
-                total_volume=total_volume,
-                description=description,
-                total_supply=total_supply,
-                abi=abi,
-                image_link=image_link,
-                last_updated=datetime.now(),
-            )
-
-            LOGGER.info(f"Token details for {token_id}: {token_details}")
-            await CoinData.create_coin(token_details)
-            return token_details
-        except requests.exceptions.RequestException as e:
-            LOGGER.error(f"An error occurred: {e}")
-            return None
-
-    async def get_token_symbol_by_contract(
-        self, contract_address: str, platform: str = "ethereum"
-    ) -> Optional[Coins]:
-        """
-        Get detailed information about a token from CoinGecko.
-
-        Args:
-            platform (str): The name of the platform (e.g., 'ethereum').
-            contract_address (str): The contract address of the token.
-
-        Returns:
-            Optional[Coins]: A Coins object if found, None otherwise.
-        """
-        c_address = self.convert_to_checksum(contract_address)
-        api_url = (
-            f"https://api.coingecko.com/api/v3/coins/{platform}/contract/{c_address}"
-        )
-
-        try:
-            response = requests.get(api_url)
-            response.raise_for_status()
-            data = response.json()
-
-            id = data.get("id")
-            symbol = data.get("symbol")
-            token_details = {"id": id, "symbol": symbol}
-            return token_details
-        except requests.exceptions.RequestException as e:
-            LOGGER.error(f"An error occurred: {e}")
-            return None
-
-
+        return amounts_out[1]

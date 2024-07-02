@@ -12,3 +12,7 @@ class Presets(Model):
     max_gas_price: Optional[int] = None
     min_circulating_supply: Optional[int] = None
     min_token_supply: Optional[int] = None
+    gas_delta: Optional[int] = 1
+    snipe_take_profit: Optional[float] = 1.25
+    snipe_stop_loss: Optional[float] = 0.15
+    balance_tradable: Optional[float] = 0.05

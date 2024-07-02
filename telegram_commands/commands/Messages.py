@@ -2,10 +2,12 @@ from textwrap import fill
 from typing import Optional
 
 from data.Networks import Network, Networks
-from lib.WalletClass import CryptoWallet
+from lib.WalletClass import ETHWallet, SolanaWallet
 from models.Presets import Presets
 from models.UserModel import User, UserWallet
 
+from solders.pubkey import Pubkey
+from solders.keypair import Keypair
 
 def profile_msg(user: User) -> str:
     """
@@ -39,8 +41,11 @@ Agreement   |  {user.accepted_on or 'N/A'}
 
     return message
 
-async def preset_msg(wallet: Optional[UserWallet], preset: Optional[Presets], amount: float):
+async def preset_msg(wallet: Optional[UserWallet], preset: Optional[Presets]):
     network: Network  = [network for network in Networks if network.id == wallet.chain_id][0] if wallet is not None else Networks[0]
+    balance = await ETHWallet(network.sn).get_balance(wallet.pub_key)
+    sol_pub_key = Keypair.from_base58_string(wallet.sol_sec_key).pubkey()
+    sol_balance = await SolanaWallet().get_balance(sol_pub_key)
     return f"""
 
 <b>Connected to {wallet.chain_name}</b>
@@ -54,19 +59,19 @@ async def preset_msg(wallet: Optional[UserWallet], preset: Optional[Presets], am
 </code>
 -----------------------------------
 💰 BALANCE
-<b>{await CryptoWallet(network.sn).get_balance(wallet.pub_key)} {'ETH' if not wallet.chain_name.lower() == "solana" else 'SOL'}</b>
+<b>{(sol_balance / 10**6) if network.sn == "SOL" else balance} {network.sn}</b>
 -----------------------------------
 💵 CURRENT GAS
-<pre>{await CryptoWallet(network.sn).get_gas_price()} WEI</pre>
+<pre>{await ETHWallet(network.sn).get_gas_price()} WEI</pre>
 -----------------------------------
 👛 MULTI WALLET ADDRESS
-<pre>{wallet.pub_key}</pre>
+<pre>{wallet.pub_key if network.sn != "SOL" else wallet.sol_pub_key}</pre>
 -----------------------------------
 🔑 PRIVATE KEY
-<pre>{wallet.sec_key}</pre>
+<pre>{wallet.sec_key if network.sn != "SOL" else wallet.sol_sec_key}</pre>
 ------------------------------------
 🗒 NOTE: <b>Ensure to store this keys somewhere as we do not have a means to recover these wallet addresses for you.</b>
-            """
+            """ if preset is not None else "Set your presets before trading"
 
 
 async def wallet_msg(wallet: Optional[UserWallet]) -> str:
@@ -89,24 +94,26 @@ Please generate a unique one or attach an existing one to your account to aid yo
     """
 
     if wallet is not None:
-        balance = await CryptoWallet(network.sn).get_balance(wallet.pub_key)
+        balance = await ETHWallet(network.sn).get_balance(wallet.pub_key)
+        sol_pub_key = Keypair.from_base58_string(wallet.sol_sec_key).pubkey()
+        sol_balance = await SolanaWallet().get_balance(sol_pub_key)
         message = f"""
 CONNECTED TO {wallet.chain_name.upper()}
----------------------------------
-👛 Public    :  <pre><code>{wallet.pub_key}</code></pre>
----------------------------------
-🔑 Private   :  <pre><code>{wallet.sec_key}</code></pre>
----------------------------------
-🗝 Encrypted :  <pre><code>{wallet.enc_key['address']}</code></pre>
----------------------------------
+-----------------------------------
+💰 BALANCE
+<b>{(sol_balance / 10**6) if network.sn == "SOL" else balance} {network.sn}</b>
+-----------------------------------
+💵 CURRENT GAS
+<pre>{await ETHWallet(network.sn).get_gas_price()} WEI</pre>
+-----------------------------------
+👛 MULTI WALLET ADDRESS
+<pre>{wallet.pub_key if network.sn != "SOL" else wallet.sol_pub_key}</pre>
+-----------------------------------
+🔑 PRIVATE KEY
+<pre>{wallet.sec_key if network.sn != "SOL" else wallet.sol_sec_key}</pre>
+------------------------------------
 
-
-💰 Balance :  {round(balance, 6)} {'ETH' if not wallet.chain_name.lower() == "solana" else 'SOL'}
----------------------------------
-⛓ ChainID :  {wallet.chain_id}
-----------------------------------
-
-💵 CURRENT GAS:------------ <pre>{await CryptoWallet(network.sn).get_gas_price()} WEI</pre>
+💵 CURRENT GAS:------------ <pre>{await ETHWallet(network.sn).get_gas_price()} WEI</pre>
 🗒 NOTE: <b>Ensure to store this keys somewhere as we do not have a means to recover these wallet addresses for you.</b>
 
         """

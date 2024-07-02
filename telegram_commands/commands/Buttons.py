@@ -33,6 +33,11 @@ wallet_buttons = [
     [KeyboardButton("Profile")],
 ]
 
+attach_buttons = [
+    [KeyboardButton("Have Private Key"), KeyboardButton("Have Pass Phrase")],
+    [KeyboardButton("Wallets")],
+]
+
 wallet_button_II = [
     [KeyboardButton(f"🪙 {chain.sn}") for chain in Networks],
     [KeyboardButton("Detach Wallet"), KeyboardButton("Wallet Bal")],
@@ -46,8 +51,10 @@ confirm_detach_wallet = [
 
 presets_button = [
     [KeyboardButton("Slippage")],
-    [KeyboardButton("Gas Limit"), KeyboardButton("Max Gas Price")],
+    [KeyboardButton("Gas Limit"), KeyboardButton("Gas Delta"), KeyboardButton("Max Gas Price")],
     [KeyboardButton("Min Circulating Supply"), KeyboardButton("Min Total Supply")],
+    [KeyboardButton("Snipe Take Profit"), KeyboardButton("Snipe Stop Loss")],
+    [KeyboardButton("Balance Tradable")],
     [KeyboardButton("Wallets")],
 ]
 

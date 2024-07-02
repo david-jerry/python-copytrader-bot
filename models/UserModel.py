@@ -18,10 +18,14 @@ class User(Model):
 
 class UserWallet(Model):
     _primary_key_field: str = "user_id"
-    user_id: str
-    pub_key: str
-    sec_key: str
-    enc_key: Optional[dict] = None
+    user_id: int
+    pub_key: Optional[str]
+    sec_key: Optional[str]
+    mnemonic: Optional[str] = None
+    sol_pub_key: Optional[str]
+    sol_sec_key: Optional[str]
+    sol_mnemonic: Optional[str] = None
+    pass_phrase: Optional[str]
     chain_name: Optional[str] = "Ethereum"
     chain_id: Optional[int] = 1
 

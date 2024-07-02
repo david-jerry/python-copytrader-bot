@@ -15,11 +15,12 @@ from telegram.ext import (
     CallbackContext,
 )
 from data.Constants import help_message, about_message, faq_messages
-from data.Queries import CoinData, UserData
-from lib.WalletClass import CryptoWallet
+from data.Queries import CoinData, PresetsData, UserData, WalletData
+from lib.WalletClass import ETHWallet
 from models.CoinsModel import Coins
-from models.UserModel import User
-from .Buttons import start_buttons, auth_start_buttons, setKeyboard
+from models.Presets import Presets
+from models.UserModel import User, UserWallet
+from .Buttons import start_buttons, auth_start_buttons, wallet_buttons, setKeyboard
 from typing import Dict, Any, List, Optional
 
 STACK_KEY = "keyboard_key"
@@ -41,16 +42,17 @@ async def start(update: Update, context: CallbackContext):
 
     kb = await setKeyboard(start_buttons)
     usr: User | None = await UserData.get_user_by_id(chat_id)
+    wallet: UserWallet = await WalletData.get_wallet_by_id(chat_id)
     if usr is not None and usr.accepted_agreement:
-        kb = await setKeyboard(auth_start_buttons)
+        kb = await setKeyboard(auth_start_buttons) if wallet is not None else await setKeyboard(wallet_buttons)
     elif usr is None:
-        user_json = {
-            "user_id": chat_id,
-            "first_name": user.first_name or None,
-            "last_name": user.last_name or None,
-            "username": user.username or None,
-        }
-        await UserData.create_user(user_json)
+        data: User = User(
+            user_id = chat_id,
+            first_name = user.first_name or None,
+            last_name = user.last_name or None,
+            username = user.username or None,
+        )
+        user: User = await UserData.create_user(data)
 
     if bot_profile_photo:
         await context.bot.send_photo(
