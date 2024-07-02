@@ -36,6 +36,7 @@ from telegram_commands.commands.Presets import (
     snipe_stop_loss_trigger,
     snipe_take_profit_trigger,
 )
+from telegram_commands.commands.SnipeTrade import process_mint_address, start_snipe_trade_trigger
 
 PRIVKEY, SOL_PRIVKEY, PASSPHRASE, SOL_PASSPHRASE = range(4)
 attach_wallet_handler = ConversationHandler(
@@ -59,11 +60,7 @@ attach_wallet_handler = ConversationHandler(
 )
 
 
-(
-    TOKEN_IN,
-    TOKEN_OUT,
-    AMOUNT_IN,
-) = range(3)
+TOKEN_IN, TOKEN_OUT, AMOUNT_IN = range(3)
 buy_sell_handler = ConversationHandler(
     entry_points=[
         MessageHandler(
@@ -79,7 +76,7 @@ buy_sell_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],  # Handle any message while attaching
 )
 
-(PROCESS_SLIPPAGE,) = range(1)
+PROCESS_SLIPPAGE = range(1)
 slippage_handler = ConversationHandler(
     entry_points=[MessageHandler(filters.Regex(r"^Slippage$"), slippage_trigger)],
     states={
@@ -212,6 +209,18 @@ copy_trade_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],  # Handle any message while attaching
 )
 
+MINT_ADDRESS = range(1)
+snipe_trade_handler = ConversationHandler(
+    entry_points=[
+        MessageHandler(filters.Regex(r"^Snipe$"), start_snipe_trade_trigger)
+    ],
+    states={
+        MINT_ADDRESS: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, process_mint_address)
+        ],
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],  # Handle any message while attaching
+)
 
 
 

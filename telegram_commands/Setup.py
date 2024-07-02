@@ -32,7 +32,8 @@ from .ConversationsImports import (
     gas_delta_handler,
     balance_tradable_handler,
     snipe_profit_handler,
-    snipe_loss_handler
+    snipe_loss_handler,
+    snipe_trade_handler
 )
 
 # Suppress specific warnings from the telegram library
@@ -120,6 +121,7 @@ def telegram_setup() -> None:
     app.add_handler(balance_tradable_handler)
     app.add_handler(snipe_profit_handler)
     app.add_handler(snipe_loss_handler)
+    app.add_handler(snipe_trade_handler)
 
     # Error handling
     app.add_error_handler(log_error)
