@@ -12,7 +12,7 @@ from bip_utils import (
 import asyncio
 import base58
 from eth_account import Account
-from solders.keypair import Keypair
+from solders.keypair import Keypair # type: ignore
 
 from lib.Logger import LOGGER # type: ignore
 
@@ -125,7 +125,7 @@ class MultiChainWalletGenerator:
                 Bip39WordsNum.WORDS_NUM_12
             )
             mnemonic = str(phrase)
-            
+
         if not sol_mnemonic:
             sol_phrase = Bip39MnemonicGenerator().FromWordsNumber(
                 Bip39WordsNum.WORDS_NUM_12
@@ -138,7 +138,7 @@ class MultiChainWalletGenerator:
 
         if private_key_hex is not None or sol_private_key_hex is not None:
             return self._generate_wallet_from_private_key(chain_type, private_key_hex, sol_private_key_hex)
-        else:            
+        else:
             if chain_type == Bip44Coins.SOLANA:
                 kp = Keypair()
                 pubkey = kp.pubkey()
