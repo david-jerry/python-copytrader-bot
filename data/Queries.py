@@ -41,7 +41,7 @@ class UserData:
     def __init__(self) -> None:
         self.store = Store(
             name="users",
-            redis_config=rConfigProduction if not DEBUG else rConfigLocal,
+            redis_config=rConfigProduction,
             life_span_in_seconds=None,
         )
         self.store.register_model(User)
@@ -138,7 +138,7 @@ class WalletData:
     def __init__(self) -> None:
         self.store = Store(
             name="wallets",
-            redis_config=rConfigProduction if not DEBUG else rConfigLocal,
+            redis_config=rConfigProduction,
             life_span_in_seconds=None,
         )
         self.store.register_model(UserWallet)
@@ -251,7 +251,7 @@ class CoinData:
     def __init__(self) -> None:
         self.store = Store(
             name="coins",
-            redis_config=rConfigProduction if not DEBUG else rConfigLocal,
+            redis_config=rConfigProduction,
             life_span_in_seconds=60 * 60 * 24 * 2,  # Cache data for 2 days
         )
         self.store.register_model(Coins)
@@ -364,7 +364,7 @@ class PresetsData:
     def __init__(self) -> None:
         self.store = Store(
             name="presets",
-            redis_config=rConfigProduction if not DEBUG else rConfigLocal,
+            redis_config=rConfigProduction,
             # life_span_in_seconds=None,  # No cache expiration set
         )
         self.store.register_model(Presets)
@@ -474,7 +474,7 @@ class UserCopyTradesTasksData:
     def __init__(self) -> None:
         self.store = Store(
             name="copy_trades",
-            redis_config=rConfigProduction if not DEBUG else rConfigLocal,
+            redis_config=rConfigProduction,
         )
         self.store.register_model(UserCopyTradesTasks)
 
@@ -587,7 +587,7 @@ class SnipeTradeData:
     def __init__(self) -> None:
         self.store = Store(
             name="snipe_trades",
-            redis_config=rConfigProduction if not DEBUG else rConfigLocal,
+            redis_config=rConfigProduction,
         )
         self.store.register_model(SnipeTrade)
 
